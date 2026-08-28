@@ -1,6 +1,11 @@
 "use strict";
 import './style.css';
 import { supabase } from './supabaseClient.js';
+import {
+  PALETA, osc, colorEq, esc, escalaPista,
+  cantPoder as cantPoderPura, totalMazo as totalMazoPura, armarMazo as armarMazoPura,
+  esPasswordDebil, mensajeError, EMAIL_RE,
+} from './gameLogic.js';
 
 const FICHAS=[
  {id:'arca',e:'🚢',n:'Arca'},{id:'corona',e:'👑',n:'Corona'},{id:'vasija',e:'🏺',n:'Vasija'},
@@ -9,10 +14,7 @@ const FICHAS=[
  {id:'fuego',e:'🔥',n:'Fuego'},{id:'trompeta',e:'🎺',n:'Trompeta'},{id:'espiga',e:'🌾',n:'Espiga'},
  {id:'olivo',e:'🫒',n:'Olivo'},{id:'estrella',e:'⭐',n:'Estrella'},{id:'ancla',e:'⚓',n:'Ancla'}
 ];
-const PALETA=['#6C3BF4','#1BA8F0','#12BF88','#FFB020','#FF5C7A','#A855F7','#00C2CB','#F4711F'];
 const PISTAS_REQ=5;
-const ESCALA_PISTAS=[1,.7,.4,.2,.1];
-const escalaPista=i=>ESCALA_PISTAS[i]!==undefined?ESCALA_PISTAS[i]:ESCALA_PISTAS[ESCALA_PISTAS.length-1];
 const TIPOS={
   qa:{n:'Pregunta y respuesta',ds:'Escribes la pregunta, la respuesta y la referencia.'},
   cita:{n:'Carrera de citas',ds:'Solo la referencia; los equipos la buscan y la leen.'},
@@ -21,13 +23,6 @@ const TIPOS={
   testamento:{n:'¿Antiguo o Nuevo?',ds:'Se muestra el nombre de un libro y hay que decir a qué Testamento pertenece.'},
   moderador:{n:'Libre del moderador',ds:'Sin banco: abres la tarjeta y tú diriges.'}
 };
-/* oscurece un hex para la sombra 3D */
-function osc(hex,f){
-  f=f===undefined?.68:f;
-  const n=parseInt(hex.slice(1),16);
-  const r=Math.round(((n>>16)&255)*f),g=Math.round(((n>>8)&255)*f),b=Math.round((n&255)*f);
-  return '#'+((1<<24)+(r<<16)+(g<<8)+b).toString(16).slice(1);
-}
 
 const CATS_DEF=[
  {k:'hombres',n:'Hombres de la Biblia',ic:'🧔',modo:'turno',tipo:'qa',color:'#1BA8F0',orden:'azar',activa:true},
@@ -255,15 +250,12 @@ const CAT_PODERES=[
 ];
 const poderDe=id=>CAT_PODERES.find(x=>x.id===id)||CAT_PODERES[0];
 let CONF_PODERES={};
-function totalMazo(){return CAT_PODERES.reduce((s,p)=>s+cantPoder(p),0);}
-function cantPoder(p){const c=CONF_PODERES[p.id];return c===undefined?p.def:Math.max(0,c|0);}
-function armarMazo(){
-  let m=[];
-  CAT_PODERES.forEach(p=>{for(let i=0;i<cantPoder(p);i++)m.push(p.id);});
-  if(m.length<8){m=[];CAT_PODERES.forEach(p=>{for(let i=0;i<p.def;i++)m.push(p.id);});}
-  for(let i=m.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));const x=m[i];m[i]=m[j];m[j]=x;}
-  return m;
-}
+/* cantPoder/totalMazo/armarMazo viven en gameLogic.js como funciones puras
+   (reciben catPoderes+conf por parámetro); estos adaptadores solo los
+   conectan con el estado real del módulo para no tocar el resto del código. */
+const cantPoder=p=>cantPoderPura(CONF_PODERES,p);
+const totalMazo=()=>totalMazoPura(CAT_PODERES,CONF_PODERES);
+const armarMazo=()=>armarMazoPura(CAT_PODERES,CONF_PODERES);
 
 let CATS=JSON.parse(JSON.stringify(CATS_DEF));
 let BANCO=JSON.parse(JSON.stringify(BANCO_DEF));
@@ -274,13 +266,14 @@ let cfgEquipos=[{nombre:'Equipo 1',ficha:'arca'},{nombre:'Equipo 2',ficha:'coron
 const $=s=>document.querySelector(s);
 const fichaDe=id=>FICHAS.find(f=>f.id===id)||FICHAS[0];
 const catDe=k=>CATS.find(c=>c.k===k);
-const colorEq=i=>PALETA[i%PALETA.length];
-const esc=t=>String(t==null?'':t).replace(/[<>&"]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
 const cv=c=>`--c:${c};--d:${osc(c)}`;
 const ls={
-  set(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}},
-  get(k){try{const d=localStorage.getItem(k);return d?JSON.parse(d):null;}catch(e){return null;}},
-  del(k){try{localStorage.removeItem(k);}catch(e){}}
+  // Los catch quedan vacíos/sin parámetro a propósito: localStorage puede
+  // fallar en modo privado o con la cuota llena, y el juego debe seguir
+  // funcionando igual (solo sin persistencia) en vez de romperse.
+  set(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch{/* sin cuota o modo privado: seguimos sin guardar */}},
+  get(k){try{const d=localStorage.getItem(k);return d?JSON.parse(d):null;}catch{return null;}},
+  del(k){try{localStorage.removeItem(k);}catch{/* nada que borrar o sin acceso */}}
 };
 const guardarDatos=()=>{ls.set('cbPersDatos',{cats:CATS,banco:BANCO,poderes:CONF_PODERES});programarGuardadoNube();};
 const guardar=()=>ls.set('cbPersJuego',S);
@@ -295,7 +288,7 @@ function bip(f=660,d=.12,tipo='sine'){
     g.gain.setValueAtTime(.16,ac.currentTime);
     g.gain.exponentialRampToValueAtTime(.001,ac.currentTime+d);
     o.start();o.stop(ac.currentTime+d);
-  }catch(e){}
+  }catch{/* audio bloqueado por el navegador (p.ej. sin interacción previa): sin sonido, sin romper el juego */}
 }
 function confeti(n){
   n=n||70;
@@ -324,7 +317,8 @@ function pintarConfig(){
     FICHAS.forEach(f=>{
       const usada=cfgEquipos.some((e2,j)=>j!==i&&e2.ficha===f.id);
       const b=document.createElement('button');
-      b.textContent=f.e;b.title=f.n;b.disabled=usada;
+      b.textContent=f.e;b.title=f.n;b.setAttribute('aria-label',f.n);b.disabled=usada;
+      b.setAttribute('aria-pressed',String(eq.ficha===f.id));
       if(eq.ficha===f.id)b.classList.add('on');
       b.onclick=()=>{cfgEquipos[i].ficha=f.id;pintarConfig();};
       sel.appendChild(b);
@@ -350,6 +344,7 @@ function pintarChipsCats(){
   CATS.forEach(v=>{
     const b=document.createElement('button');
     b.className='chip'+(v.activa?' on':'');
+    b.setAttribute('aria-pressed',String(!!v.activa));
     if(v.activa){b.style.background=v.color;b.style.boxShadow='0 3px 0 '+osc(v.color);}
     b.textContent=v.ic+' '+v.n;
     b.onclick=()=>{v.activa=!v.activa;guardarDatos();pintarChipsCats();};
@@ -383,8 +378,10 @@ $('#btnJugarInicio').onclick=()=>irA('pConfig');
 $('#btnJugarFinal').onclick=()=>irA('pConfig');
 $('#btnInicioDesdeConfig').onclick=()=>{pintarInicio();irA('pInicio');};
 $('#chipCasillas').onclick=e=>{S.usarCasillas=!S.usarCasillas;e.target.classList.toggle('on',S.usarCasillas);
+  e.target.setAttribute('aria-pressed',String(S.usarCasillas));
   e.target.style.background=S.usarCasillas?'var(--violeta)':'';};
 $('#chipSonido').onclick=e=>{S.sonido=!S.sonido;e.target.classList.toggle('on',S.sonido);
+  e.target.setAttribute('aria-pressed',String(S.sonido));
   e.target.style.background=S.sonido?'var(--celeste)':'';bip(880,.08);};
 $('#btnIniciar').onclick=()=>{
   if(!CATS.some(c=>c.activa)){alert('Prende al menos una categoría.');return;}
@@ -440,6 +437,9 @@ function pintarEquipos(){
 let animando=false;
 function toast(txt){
   const t=document.createElement('div');t.className='toast';t.textContent=txt;
+  /* role="status" + aria-live: un lector de pantalla anuncia el mensaje solo,
+     sin que el usuario tenga que ir a buscarlo. */
+  t.setAttribute('role','status');t.setAttribute('aria-live','polite');
   document.body.appendChild(t);
   setTimeout(()=>{if(t.parentElement)t.remove();},3200);
 }
@@ -519,18 +519,31 @@ function siguienteItem(k){
    cerrarlos a medias dejaría la partida en un estado inconsistente. Los
    modales informativos (como "Mi cuenta") sí pueden marcarse cerrables. */
 let modalCerrable=false;
+let modalUltimoFoco=null;
 function modal(html,ancho,opts){
   opts=opts||{};
   modalCerrable=!!opts.cerrable;
+  modalUltimoFoco=document.activeElement;
   const btnX=modalCerrable?'<button class="modal-x" id="modalXBtn" aria-label="Cerrar" title="Cerrar">✕</button>':'';
-  $('#modales').innerHTML=`<div class="velo" id="modalVelo"><div class="hoja"${ancho?` style="width:min(${ancho}px,100%)"`:''}>${btnX}${html}</div></div>`;
+  $('#modales').innerHTML=`<div class="velo" id="modalVelo"><div class="hoja" role="dialog" aria-modal="true" tabindex="-1"${ancho?` style="width:min(${ancho}px,100%)"`:''}>${btnX}${html}</div></div>`;
   if(modalCerrable){
     $('#modalVelo').onclick=e=>{if(e.target.id==='modalVelo')cerrarModal();};
     $('#modalXBtn').onclick=cerrarModal;
   }
-  return $('#modales .hoja');
+  const hoja=$('#modales .hoja');
+  /* Mueve el foco de teclado adentro del modal (si no, un usuario de teclado
+     o lector de pantalla se queda "detrás" del velo, sin saber que se abrió
+     algo). No es un focus-trap completo — con Tab se puede seguir saliendo
+     hacia la página de fondo — pero es la mejora que más falta hacía. */
+  hoja.focus();
+  return hoja;
 }
-function cerrarModal(){$('#modales').innerHTML='';modalCerrable=false;}
+function cerrarModal(){
+  $('#modales').innerHTML='';
+  modalCerrable=false;
+  if(modalUltimoFoco&&document.contains(modalUltimoFoco))modalUltimoFoco.focus();
+  modalUltimoFoco=null;
+}
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&modalCerrable)cerrarModal();});
 
 function abrirPregunta(k){
@@ -1141,18 +1154,39 @@ function programarGuardadoNube(){
   clearTimeout(timerGuardadoNube);
   timerGuardadoNube=setTimeout(guardarDatosNube,700);
 }
+/* Evita avisar del mismo fallo de guardado una y otra vez: guardarDatosNube()
+   se llama tras cada edición (con debounce), así que sin esto una racha sin
+   conexión mostraría un toast cada 700ms. Solo avisamos al empezar a fallar
+   y al recuperarse, no en cada intento de por medio. */
+let nubeFallando=false;
 async function guardarDatosNube(){
   if(!supabase||!sesionActual)return;
   const payload={cats:CATS,banco:BANCO,poderes:CONF_PODERES};
-  const {error}=await supabase.from('user_game_data')
-    .upsert({user_id:sesionActual.user.id,data:payload},{onConflict:'user_id'});
-  if(error)console.error('[carrera-biblica] Error guardando en la nube:',error.message);
+  try{
+    const {error}=await supabase.from('user_game_data')
+      .upsert({user_id:sesionActual.user.id,data:payload},{onConflict:'user_id'});
+    if(error)throw error;
+    if(nubeFallando){nubeFallando=false;toast('☁️ Conexión recuperada: ya se guarda en la nube otra vez');}
+  }catch(err){
+    console.error('[carrera-biblica] Error guardando en la nube:',err&&err.message);
+    if(!nubeFallando){
+      nubeFallando=true;
+      toast('⚠️ No se pudo guardar en la nube (sin conexión). Se sigue guardando en este dispositivo.');
+    }
+  }
 }
 async function cargarDatosNube(){
   if(!supabase||!sesionActual)return;
-  const {data,error}=await supabase.from('user_game_data')
-    .select('data').eq('user_id',sesionActual.user.id).maybeSingle();
-  if(error){console.error('[carrera-biblica] Error leyendo la nube:',error.message);return;}
+  let data,error;
+  try{
+    ({data,error}=await supabase.from('user_game_data')
+      .select('data').eq('user_id',sesionActual.user.id).maybeSingle());
+  }catch(err){error=err;}
+  if(error){
+    console.error('[carrera-biblica] Error leyendo la nube:',error.message);
+    toast('⚠️ No se pudieron cargar tus preguntas de la nube. Se muestran las de este dispositivo.');
+    return;
+  }
   if(data&&data.data&&Array.isArray(data.data.cats)&&data.data.cats.length){
     CATS=data.data.cats;BANCO=data.data.banco||{};CONF_PODERES=data.data.poderes||{};
   }else{
@@ -1176,46 +1210,6 @@ function renderCuentaBtns(){
     b.textContent=txt;b.onclick=abrirCuenta;
   });
 }
-/* Lista corta de contraseñas extremadamente comunes/filtradas.
-   Supabase puede revisar contra HaveIBeenPwned (protección real y mucho más
-   completa), pero esa función es solo para planes Pro en adelante. Esta lista
-   es un mínimo gratuito para bloquear los casos más obvios (ver SECURITY.md). */
-const PASS_DEBILES=new Set([
-  'password','password1','password123','12345678','123456789','1234567890',
-  '123456','1234567','111111','000000','11111111','12341234','qwerty123',
-  'qwertyui','qwerty12','1q2w3e4r','iloveyou','letmein','trustno1','admin123',
-  'welcome1','sunshine','superman','football','baseball','dragon123','monkey123',
-  'abc123456','abcd1234','password12','contrasena','contraseña','clave1234',
-  '12345678910','asdfghjk','asdf1234','changeme','changeme1','p@ssword',
-  'p@ssw0rd','passw0rd','qazwsx123','zxcvbnm12','starwars1'
-]);
-function esPasswordDebil(pass,email){
-  const p=pass.toLowerCase().trim();
-  if(PASS_DEBILES.has(p))return true;
-  if(email&&p===email.split('@')[0].toLowerCase())return true;
-  if(/^([a-z0-9])\1{5,}$/.test(p))return true; // ej: "aaaaaaaa"
-  if(/^(0123456789|1234567890|01234567|12345678){1,}/.test(p))return true;
-  return false;
-}
-/* Traduce los mensajes de error más comunes de Supabase Auth a español llano.
-   Si no reconocemos el mensaje, mostramos el original en vez de fallar en
-   silencio: mejor un mensaje en inglés que ninguna pista de qué pasó. */
-function mensajeError(err){
-  const m=(err&&err.message)||String(err||'');
-  const mapa=[
-    [/invalid login credentials/i,'Correo o contraseña incorrectos.'],
-    [/user already registered|already been registered/i,'Ya existe una cuenta con ese correo. Intenta iniciar sesión.'],
-    [/email not confirmed/i,'Confirma tu correo antes de iniciar sesión — revisa tu bandeja de entrada.'],
-    [/password should be at least/i,'La contraseña es muy corta.'],
-    [/unable to validate email address|invalid email/i,'Ese correo no parece válido.'],
-    [/rate limit|too many requests|security purposes/i,'Espera unos segundos antes de intentar de nuevo.'],
-    [/network|fetch/i,'No hay conexión con el servidor. Revisa tu internet e intenta otra vez.'],
-  ];
-  for(const [re,txt] of mapa)if(re.test(m))return txt;
-  return m||'No se pudo completar la acción. Intenta de nuevo.';
-}
-const EMAIL_RE=/^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
 async function crearCuenta(email,password,onError,onOk){
   if(!EMAIL_RE.test(email)){onError&&onError('Escribe un correo válido.');return;}
   if(esPasswordDebil(password,email)){
@@ -1268,7 +1262,9 @@ function activarVerPass(input,btn){
     const oculto=input.type==='password';
     input.type=oculto?'text':'password';
     btn.textContent=oculto?'🙈':'👁️';
-    btn.title=oculto?'Ocultar contraseña':'Mostrar contraseña';
+    const etiqueta=oculto?'Ocultar contraseña':'Mostrar contraseña';
+    btn.title=etiqueta;btn.setAttribute('aria-label',etiqueta);
+    btn.setAttribute('aria-pressed',String(oculto));
   };
 }
 function abrirCuenta(){
@@ -1288,11 +1284,11 @@ function abrirCuenta(){
       <div class="campo"><label>Correo</label><input type="email" id="cuEmail" autocomplete="email" inputmode="email"></div>
       <div class="campo campo-pass"><label>Contraseña (mínimo 8 caracteres)</label>
         <input type="password" id="cuPass" autocomplete="current-password" minlength="8">
-        <button type="button" class="ver-pass" id="verPass1" title="Mostrar contraseña">👁️</button></div>
+        <button type="button" class="ver-pass" id="verPass1" title="Mostrar contraseña" aria-label="Mostrar contraseña" aria-pressed="false">👁️</button></div>
       <div class="campo campo-pass" id="campoConfirmar">
         <label>Repite la contraseña <span style="font-weight:600;opacity:.7">(solo para crear cuenta)</span></label>
         <input type="password" id="cuPass2" autocomplete="new-password">
-        <button type="button" class="ver-pass" id="verPass2" title="Mostrar contraseña">👁️</button></div>
+        <button type="button" class="ver-pass" id="verPass2" title="Mostrar contraseña" aria-label="Mostrar contraseña" aria-pressed="false">👁️</button></div>
       <div style="display:flex;gap:10px;flex-wrap:wrap">
         <button class="b3" id="cuEntrar" style="--c:var(--menta);--d:var(--menta-d)">Iniciar sesión</button>
         <button class="b3 pale" id="cuCrear">Crear cuenta</button>
@@ -1334,7 +1330,7 @@ function abrirNuevaPassword(){
       <p class="nota">Este enlace de recuperación confirma que eres tú. Escribe tu nueva contraseña.</p>
       <div class="campo campo-pass"><label>Nueva contraseña (mínimo 8 caracteres)</label>
         <input type="password" id="npPass" autocomplete="new-password" minlength="8">
-        <button type="button" class="ver-pass" id="verPassNp" title="Mostrar contraseña">👁️</button></div>
+        <button type="button" class="ver-pass" id="verPassNp" title="Mostrar contraseña" aria-label="Mostrar contraseña" aria-pressed="false">👁️</button></div>
       <button class="b3" id="npGuardar" style="--c:var(--menta);--d:var(--menta-d)">Guardar contraseña</button>
       <p class="nota" id="npMsg" style="margin-top:10px"></p>
     </div>`,460,{cerrable:true});
@@ -1351,6 +1347,10 @@ if(supabase){
   supabase.auth.getSession().then(({data})=>{
     sesionActual=data.session;renderCuentaBtns();
     if(sesionActual)cargarDatosNube();
+  }).catch(err=>{
+    // Sesión guardada corrupta, o sin conexión al arrancar: seguimos en modo
+    // local en vez de dejar la página a medio cargar.
+    console.error('[carrera-biblica] Error recuperando la sesión:',err&&err.message);
   });
   supabase.auth.onAuthStateChange((event,session)=>{
     sesionActual=session;renderCuentaBtns();

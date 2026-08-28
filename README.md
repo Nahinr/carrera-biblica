@@ -37,6 +37,19 @@ Si no configuras `.env.local`, el juego funciona igual de bien: simplemente no
 habrá inicio de sesión ni sincronización en la nube (todo queda en
 `localStorage`, como siempre).
 
+### Calidad de código
+
+```bash
+npm run test    # pruebas unitarias (Vitest) de src/gameLogic.js
+npm run lint    # ESLint — atrapa variables no definidas, código inalcanzable, etc.
+```
+
+Ambos corren automáticamente en cada Pull Request (`.github/workflows/ci.yml`).
+`src/gameLogic.js` concentra la lógica del juego que no depende del DOM
+(colores, mazo de poderes, validación de contraseñas, mensajes de error) para
+que se pueda probar sin un navegador; `src/main.js` la importa y la conecta
+con el estado real y la interfaz.
+
 ## Poner en marcha Supabase (una sola vez)
 
 1. Crea una cuenta/proyecto gratis en <https://supabase.com/dashboard> (esto

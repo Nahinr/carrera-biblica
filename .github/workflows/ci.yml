@@ -20,6 +20,10 @@ jobs:
 
       - run: npm ci
 
+      - run: npm run lint
+
+      - run: npm run test
+
       # Verifica que el proyecto compile. Usa valores de relleno: no hace
       # falta un proyecto de Supabase real para comprobar que el build no
       # está roto en un PR.
