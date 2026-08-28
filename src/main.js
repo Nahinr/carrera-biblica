@@ -1139,9 +1139,12 @@ function renderCuentaBtns(){
 }
 async function crearCuenta(email,password,onError){
   if(!supabase){onError&&onError('La sincronización en la nube no está configurada todavía.');return;}
-  const {error}=await supabase.auth.signUp({email,password});
+  const {data,error}=await supabase.auth.signUp({email,password});
   if(error){onError&&onError(error.message);return;}
-  toast('✉️ Revisa tu correo para confirmar la cuenta');
+  /* Si el proyecto de Supabase tiene "Confirm email" apagado, signUp ya
+     regresa una sesión activa y no hace falta pedir que revisen el correo. */
+  if(data&&data.session){toast('Cuenta creada, ¡bienvenido!');}
+  else{toast('✉️ Revisa tu correo para confirmar la cuenta');}
   cerrarModal();
 }
 async function iniciarSesion(email,password,onError){
