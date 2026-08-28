@@ -17,10 +17,100 @@
 </head>
 <body>
 
+<!-- ============ INICIO ============ -->
+<div class="pantalla-ancha" id="pInicio">
+  <section class="hero">
+    <div class="hero-in">
+      <div class="hero-tx">
+        <span class="eyebrow">🏁 Trivia bíblica para grupos</span>
+        <h1 class="h1-comic">Responde.<br>Avanza.<br>Gana la carrera.</h1>
+        <p class="hero-sub">El juego de preguntas bíblicas para tu grupo de jóvenes, célula o
+          familia. Se juega desde un solo dispositivo — nadie más necesita instalar nada.</p>
+        <div class="hero-cta">
+          <button class="b3" id="btnJugarInicio" style="--c:var(--menta);--d:var(--menta-d)">🚀 Jugar gratis</button>
+          <a class="b3 pale" href="#como-funciona">Ver cómo funciona</a>
+        </div>
+      </div>
+      <div class="hero-pista" aria-hidden="true">
+        <svg viewBox="0 0 640 260" class="pista-svg">
+          <path class="pista-linea" d="M64,169 C140,230 170,240 218,221 C280,195 320,165 371,143 C420,120 460,95 499,65 C520,52 560,45 589,47"/>
+        </svg>
+        <span class="pista-ficha t1" style="--dur:2.4s;--delay:0s"><b>🚢</b></span>
+        <span class="pista-ficha t2" style="--dur:2.7s;--delay:.3s"><b>👑</b></span>
+        <span class="pista-ficha t3" style="--dur:2.3s;--delay:.6s"><b>🏺</b></span>
+        <span class="pista-ficha t4" style="--dur:2.6s;--delay:.15s"><b>🕊️</b></span>
+        <span class="pista-meta">🏆</span>
+      </div>
+    </div>
+  </section>
+
+  <section class="sec-como" id="como-funciona">
+    <h2 class="tit-2">Así se juega</h2>
+    <p class="sub-2">Cuatro pasos, se repiten en cada turno hasta que un equipo cruza la meta.</p>
+    <div class="pasos-flujo">
+      <div class="paso-flujo" style="--c:var(--celeste);--d:var(--celeste-d)">
+        <span class="pf-ic">👥</span><b>Arma tus equipos</b>
+        <p>Ponle nombre y ficha a cada equipo — de 2 a 6.</p>
+      </div>
+      <span class="pf-flecha">→</span>
+      <div class="paso-flujo" style="--c:var(--violeta);--d:var(--violeta-d)">
+        <span class="pf-ic">🗂️</span><b>Elige categoría</b>
+        <p>Personajes, animales, lugares o citas bíblicas.</p>
+      </div>
+      <span class="pf-flecha">→</span>
+      <div class="paso-flujo" style="--c:var(--sol);--d:var(--sol-d)">
+        <span class="pf-ic">💡</span><b>Responde y suma</b>
+        <p>El que acierta destapa un número con un poder escondido.</p>
+      </div>
+      <span class="pf-flecha">→</span>
+      <div class="paso-flujo" style="--c:var(--menta);--d:var(--menta-d)">
+        <span class="pf-ic">🏁</span><b>Llega a la meta</b>
+        <p>Avanza, esquiva bloqueos y sé el primer equipo en cruzar.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="sec-cats">
+    <h2 class="tit-2">Las categorías de esta noche</h2>
+    <p class="sub-2" id="statPreguntas">Listas para usar, sin preparar nada.</p>
+    <div class="cats-tira" id="catsTira"></div>
+  </section>
+
+  <section class="sec-features">
+    <div class="feat">
+      <span class="feat-ic">🎮</span>
+      <b>Sin instalar nada</b>
+      <p>Funciona en el navegador de cualquier celular, tablet o TV.</p>
+    </div>
+    <div class="feat">
+      <span class="feat-ic">🧩</span>
+      <b>Poderes y bloqueos</b>
+      <p>Cada acierto destapa un número: avanzar, escudo, doble puntaje o un bloqueo sorpresa.</p>
+    </div>
+    <div class="feat">
+      <span class="feat-ic">☁️</span>
+      <b>Tu propio banco de preguntas</b>
+      <p>Crea una cuenta gratis y guarda tus categorías en la nube, listas en cualquier dispositivo.</p>
+    </div>
+  </section>
+
+  <section class="sec-cta-final">
+    <h2 class="tit-2" style="color:#fff">¿Listos para competir?</h2>
+    <button class="b3" id="btnJugarFinal" style="--c:#fff;--d:#D9D6EE;color:var(--violeta)">🚀 Jugar gratis ahora</button>
+  </section>
+
+  <footer class="pie-inicio">
+    <span>🏁 Carrera Bíblica</span>
+    <button class="link-pie" id="btnAdmin0">Panel de preguntas</button>
+  </footer>
+</div>
+
 <!-- ============ CONFIGURACIÓN ============ -->
-<div class="pantalla" id="pConfig">
+<div class="pantalla oculto" id="pConfig">
   <div class="top">
-    <div class="logo"><span class="em">🏁</span><h1>Carrera Bíblica</h1><span class="sello">Personajes y lugares</span></div>
+    <button class="logo logo-btn" id="btnInicioDesdeConfig" title="Volver al inicio">
+      <span class="em">🏁</span><h1>Carrera Bíblica</h1><span class="sello">Personajes y lugares</span>
+    </button>
     <div class="der">
       <button class="b3 pale chico" id="btnCuenta">Iniciar sesión</button>
       <button class="b3 pale chico" id="btnAdmin1">Preguntas</button>

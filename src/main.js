@@ -362,6 +362,26 @@ $('#btnAddEq').onclick=()=>{
   cfgEquipos.push({nombre:'Equipo '+(cfgEquipos.length+1),ficha:libre?libre.id:'rollo'});
   pintarConfig();
 };
+
+/* ============ PÁGINA DE INICIO ============ */
+function pintarInicio(){
+  const tira=$('#catsTira');
+  if(!tira)return;
+  tira.innerHTML='';
+  CATS.forEach(v=>{
+    const d=document.createElement('div');d.className='cat-mini';
+    const total=(BANCO[v.k]||[]).length;
+    d.innerHTML=`<span class="em">${v.ic}</span>
+      <span>${esc(v.n)}<small>${v.tipo==='moderador'?'libre del moderador':total+' preguntas'}</small></span>`;
+    tira.appendChild(d);
+  });
+  const totalPreguntas=Object.values(BANCO).reduce((s,a)=>s+(a?a.length:0),0);
+  const stat=$('#statPreguntas');
+  if(stat)stat.textContent=`${totalPreguntas}+ preguntas listas, en ${CATS.length} categorías.`;
+}
+$('#btnJugarInicio').onclick=()=>irA('pConfig');
+$('#btnJugarFinal').onclick=()=>irA('pConfig');
+$('#btnInicioDesdeConfig').onclick=()=>{pintarInicio();irA('pInicio');};
 $('#chipCasillas').onclick=e=>{S.usarCasillas=!S.usarCasillas;e.target.classList.toggle('on',S.usarCasillas);
   e.target.style.background=S.usarCasillas?'var(--violeta)':'';};
 $('#chipSonido').onclick=e=>{S.sonido=!S.sonido;e.target.classList.toggle('on',S.sonido);
@@ -379,7 +399,7 @@ $('#btnIniciar').onclick=()=>{
   bip(523,.1);setTimeout(()=>bip(784,.16),120);
 };
 function irA(id){
-  ['pConfig','pJuego','pAdmin'].forEach(p=>$('#'+p).classList.toggle('oculto',p!==id));
+  ['pInicio','pConfig','pJuego','pAdmin'].forEach(p=>$('#'+p).classList.toggle('oculto',p!==id));
   window.scrollTo(0,0);
 }
 
@@ -494,11 +514,24 @@ function siguienteItem(k){
   S.usadas[k].push(idx);
   return banco[idx];
 }
-function modal(html,ancho){
-  $('#modales').innerHTML=`<div class="velo"><div class="hoja"${ancho?` style="width:min(${ancho}px,100%)"`:''}>${html}</div></div>`;
+/* Por defecto los modales del juego NO se cierran con Esc/clic afuera: muchos
+   representan una acción pendiente (asignar el punto, aplicar un poder) y
+   cerrarlos a medias dejaría la partida en un estado inconsistente. Los
+   modales informativos (como "Mi cuenta") sí pueden marcarse cerrables. */
+let modalCerrable=false;
+function modal(html,ancho,opts){
+  opts=opts||{};
+  modalCerrable=!!opts.cerrable;
+  const btnX=modalCerrable?'<button class="modal-x" id="modalXBtn" aria-label="Cerrar" title="Cerrar">✕</button>':'';
+  $('#modales').innerHTML=`<div class="velo" id="modalVelo"><div class="hoja"${ancho?` style="width:min(${ancho}px,100%)"`:''}>${btnX}${html}</div></div>`;
+  if(modalCerrable){
+    $('#modalVelo').onclick=e=>{if(e.target.id==='modalVelo')cerrarModal();};
+    $('#modalXBtn').onclick=cerrarModal;
+  }
   return $('#modales .hoja');
 }
-function cerrarModal(){$('#modales').innerHTML='';}
+function cerrarModal(){$('#modales').innerHTML='';modalCerrable=false;}
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&modalCerrable)cerrarModal();});
 
 function abrirPregunta(k){
   if(animando||S.fin)return;
@@ -807,7 +840,13 @@ $('#btnTerminar').onclick=()=>terminar();
 let adminK=null,editIdx=null,volverA='pConfig';
 $('#btnAdmin1').onclick=()=>{volverA='pConfig';abrirAdmin();};
 $('#btnAdmin2').onclick=()=>{volverA='pJuego';abrirAdmin();};
-$('#btnVolver').onclick=()=>{irA(volverA);volverA==='pConfig'?pintarChipsCats():pintarCats();};
+$('#btnAdmin0').onclick=()=>{volverA='pInicio';abrirAdmin();};
+$('#btnVolver').onclick=()=>{
+  irA(volverA);
+  if(volverA==='pConfig')pintarChipsCats();
+  else if(volverA==='pInicio')pintarInicio();
+  else pintarCats();
+};
 function abrirAdmin(){
   irA('pAdmin');
   if(!adminK||!catDe(adminK))adminK=CATS.length?CATS[0].k:null;
@@ -1122,7 +1161,7 @@ async function cargarDatosNube(){
     await guardarDatosNube();
   }
   ls.set('cbPersDatos',{cats:CATS,banco:BANCO,poderes:CONF_PODERES});
-  pintarChipsCats();
+  pintarChipsCats();pintarInicio();
   const pAdmin=$('#pAdmin');
   if(pAdmin&&!pAdmin.classList.contains('oculto')){
     if(!catDe(adminK))adminK=CATS.length?CATS[0].k:null;
@@ -1158,30 +1197,79 @@ function esPasswordDebil(pass,email){
   if(/^(0123456789|1234567890|01234567|12345678){1,}/.test(p))return true;
   return false;
 }
-async function crearCuenta(email,password,onError){
+/* Traduce los mensajes de error más comunes de Supabase Auth a español llano.
+   Si no reconocemos el mensaje, mostramos el original en vez de fallar en
+   silencio: mejor un mensaje en inglés que ninguna pista de qué pasó. */
+function mensajeError(err){
+  const m=(err&&err.message)||String(err||'');
+  const mapa=[
+    [/invalid login credentials/i,'Correo o contraseña incorrectos.'],
+    [/user already registered|already been registered/i,'Ya existe una cuenta con ese correo. Intenta iniciar sesión.'],
+    [/email not confirmed/i,'Confirma tu correo antes de iniciar sesión — revisa tu bandeja de entrada.'],
+    [/password should be at least/i,'La contraseña es muy corta.'],
+    [/unable to validate email address|invalid email/i,'Ese correo no parece válido.'],
+    [/rate limit|too many requests|security purposes/i,'Espera unos segundos antes de intentar de nuevo.'],
+    [/network|fetch/i,'No hay conexión con el servidor. Revisa tu internet e intenta otra vez.'],
+  ];
+  for(const [re,txt] of mapa)if(re.test(m))return txt;
+  return m||'No se pudo completar la acción. Intenta de nuevo.';
+}
+const EMAIL_RE=/^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+async function crearCuenta(email,password,onError,onOk){
+  if(!EMAIL_RE.test(email)){onError&&onError('Escribe un correo válido.');return;}
   if(esPasswordDebil(password,email)){
     onError&&onError('Esa contraseña es demasiado común/filtrada. Elige una distinta.');
     return;
   }
   if(!supabase){onError&&onError('La sincronización en la nube no está configurada todavía.');return;}
   const {data,error}=await supabase.auth.signUp({email,password});
-  if(error){onError&&onError(error.message);return;}
+  if(error){onError&&onError(mensajeError(error));return;}
   /* Si el proyecto de Supabase tiene "Confirm email" apagado, signUp ya
      regresa una sesión activa y no hace falta pedir que revisen el correo. */
   if(data&&data.session){toast('Cuenta creada, ¡bienvenido!');}
   else{toast('✉️ Revisa tu correo para confirmar la cuenta');}
+  onOk&&onOk();
   cerrarModal();
 }
-async function iniciarSesion(email,password,onError){
+async function iniciarSesion(email,password,onError,onOk){
   if(!supabase){onError&&onError('La sincronización en la nube no está configurada todavía.');return;}
   const {error}=await supabase.auth.signInWithPassword({email,password});
-  if(error){onError&&onError(error.message);return;}
+  if(error){onError&&onError(mensajeError(error));return;}
+  onOk&&onOk();
   cerrarModal();toast('Sesión iniciada');
 }
 async function cerrarSesion(){
   if(!supabase)return;
   await supabase.auth.signOut();
   toast('Sesión cerrada');
+}
+async function olvidoPassword(email,onError,onOk){
+  if(!EMAIL_RE.test(email)){onError&&onError('Escribe tu correo arriba primero.');return;}
+  if(!supabase){onError&&onError('La sincronización en la nube no está configurada todavía.');return;}
+  const {error}=await supabase.auth.resetPasswordForEmail(email,{redirectTo:location.origin+location.pathname});
+  if(error){onError&&onError(mensajeError(error));return;}
+  /* Mensaje igual exista o no la cuenta: evita que alguien use este formulario
+     para averiguar qué correos tienen cuenta en el sistema. */
+  onOk&&onOk('Si existe una cuenta con ese correo, te enviamos un enlace para elegir una nueva contraseña.');
+}
+async function actualizarPasswordNueva(password,onError){
+  if(esPasswordDebil(password,(sesionActual&&sesionActual.user.email)||'')){
+    onError&&onError('Esa contraseña es demasiado común/filtrada. Elige una distinta.');
+    return;
+  }
+  const {error}=await supabase.auth.updateUser({password});
+  if(error){onError&&onError(mensajeError(error));return;}
+  cerrarModal();toast('Contraseña actualizada. Ya puedes usarla la próxima vez.');
+}
+/* Botón de "ver/ocultar" sobre un input de contraseña ya insertado en el DOM. */
+function activarVerPass(input,btn){
+  btn.onclick=()=>{
+    const oculto=input.type==='password';
+    input.type=oculto?'text':'password';
+    btn.textContent=oculto?'🙈':'👁️';
+    btn.title=oculto?'Ocultar contraseña':'Mostrar contraseña';
+  };
 }
 function abrirCuenta(){
   if(sesionActual){
@@ -1190,34 +1278,72 @@ function abrirCuenta(){
         <p class="nota"><b>${esc(sesionActual.user.email)}</b></p>
         <p class="nota">Tus categorías y preguntas propias se guardan en la nube: estarán disponibles en cualquier dispositivo donde inicies sesión con esta cuenta.</p>
         <button class="b3 pale" id="btnSalir" style="margin-top:14px">Cerrar sesión</button>
-      </div>`,480);
+      </div>`,480,{cerrable:true});
     c.querySelector('#btnSalir').onclick=async()=>{await cerrarSesion();cerrarModal();};
     return;
   }
   const c=modal(`<div class="cab" style="${cv('#6C3BF4')}"><span class="ic">👤</span><h2>Mi cuenta</h2></div>
     <div class="cont">
       <p class="nota">Inicia sesión para guardar tus propias categorías y preguntas en la nube. Sin cuenta, el juego funciona igual, pero solo se guarda en este dispositivo.</p>
-      <div class="campo"><label>Correo</label><input type="email" id="cuEmail" autocomplete="email"></div>
-      <div class="campo"><label>Contraseña (mínimo 8 caracteres)</label><input type="password" id="cuPass" autocomplete="current-password" minlength="8"></div>
+      <div class="campo"><label>Correo</label><input type="email" id="cuEmail" autocomplete="email" inputmode="email"></div>
+      <div class="campo campo-pass"><label>Contraseña (mínimo 8 caracteres)</label>
+        <input type="password" id="cuPass" autocomplete="current-password" minlength="8">
+        <button type="button" class="ver-pass" id="verPass1" title="Mostrar contraseña">👁️</button></div>
+      <div class="campo campo-pass" id="campoConfirmar">
+        <label>Repite la contraseña <span style="font-weight:600;opacity:.7">(solo para crear cuenta)</span></label>
+        <input type="password" id="cuPass2" autocomplete="new-password">
+        <button type="button" class="ver-pass" id="verPass2" title="Mostrar contraseña">👁️</button></div>
       <div style="display:flex;gap:10px;flex-wrap:wrap">
         <button class="b3" id="cuEntrar" style="--c:var(--menta);--d:var(--menta-d)">Iniciar sesión</button>
         <button class="b3 pale" id="cuCrear">Crear cuenta</button>
       </div>
-      <p class="nota" id="cuMsg" style="margin-top:14px"></p>
-    </div>`,480);
+      <button class="link-sutil" id="cuOlvido" style="margin-top:14px">¿Olvidaste tu contraseña?</button>
+      <p class="nota" id="cuMsg" style="margin-top:10px"></p>
+    </div>`,480,{cerrable:true});
   const msg=c.querySelector('#cuMsg');
-  const leer=()=>({email:c.querySelector('#cuEmail').value.trim(),pass:c.querySelector('#cuPass').value});
+  const inpEmail=c.querySelector('#cuEmail'),inpPass=c.querySelector('#cuPass');
+  activarVerPass(inpPass,c.querySelector('#verPass1'));
+  activarVerPass(c.querySelector('#cuPass2'),c.querySelector('#verPass2'));
+  const leer=()=>({email:inpEmail.value.trim().toLowerCase(),pass:inpPass.value,pass2:c.querySelector('#cuPass2').value});
+  const btns=[c.querySelector('#cuEntrar'),c.querySelector('#cuCrear')];
+  const ocupado=activo=>btns.forEach(b=>b.disabled=activo);
   c.querySelector('#cuEntrar').onclick=()=>{
     const {email,pass}=leer();
-    if(!email||pass.length<8){msg.textContent='Escribe un correo y una contraseña de al menos 8 caracteres.';return;}
-    msg.textContent='Entrando…';
-    iniciarSesion(email,pass,m=>{msg.textContent=m;});
+    if(!EMAIL_RE.test(email)){msg.textContent='Escribe un correo válido.';return;}
+    if(pass.length<8){msg.textContent='La contraseña debe tener al menos 8 caracteres.';return;}
+    msg.textContent='Entrando…';ocupado(true);
+    iniciarSesion(email,pass,m=>{msg.textContent=m;ocupado(false);},()=>ocupado(false));
   };
   c.querySelector('#cuCrear').onclick=()=>{
-    const {email,pass}=leer();
-    if(!email||pass.length<8){msg.textContent='Escribe un correo y una contraseña de al menos 8 caracteres.';return;}
-    msg.textContent='Creando cuenta…';
-    crearCuenta(email,pass,m=>{msg.textContent=m;});
+    const {email,pass,pass2}=leer();
+    if(!EMAIL_RE.test(email)){msg.textContent='Escribe un correo válido.';return;}
+    if(pass.length<8){msg.textContent='La contraseña debe tener al menos 8 caracteres.';return;}
+    if(pass!==pass2){msg.textContent='Las dos contraseñas no coinciden.';return;}
+    msg.textContent='Creando cuenta…';ocupado(true);
+    crearCuenta(email,pass,m=>{msg.textContent=m;ocupado(false);},()=>ocupado(false));
+  };
+  c.querySelector('#cuOlvido').onclick=()=>{
+    const {email}=leer();
+    msg.textContent='Enviando…';
+    olvidoPassword(email,m=>{msg.textContent=m;},m=>{msg.textContent=m;});
+  };
+}
+function abrirNuevaPassword(){
+  const c=modal(`<div class="cab" style="${cv('#6C3BF4')}"><span class="ic">🔑</span><h2>Elige una nueva contraseña</h2></div>
+    <div class="cont">
+      <p class="nota">Este enlace de recuperación confirma que eres tú. Escribe tu nueva contraseña.</p>
+      <div class="campo campo-pass"><label>Nueva contraseña (mínimo 8 caracteres)</label>
+        <input type="password" id="npPass" autocomplete="new-password" minlength="8">
+        <button type="button" class="ver-pass" id="verPassNp" title="Mostrar contraseña">👁️</button></div>
+      <button class="b3" id="npGuardar" style="--c:var(--menta);--d:var(--menta-d)">Guardar contraseña</button>
+      <p class="nota" id="npMsg" style="margin-top:10px"></p>
+    </div>`,460,{cerrable:true});
+  const inp=c.querySelector('#npPass'),msg=c.querySelector('#npMsg'),btn=c.querySelector('#npGuardar');
+  activarVerPass(inp,c.querySelector('#verPassNp'));
+  btn.onclick=()=>{
+    if(inp.value.length<8){msg.textContent='La contraseña debe tener al menos 8 caracteres.';return;}
+    msg.textContent='Guardando…';btn.disabled=true;
+    actualizarPasswordNueva(inp.value,m=>{msg.textContent=m;btn.disabled=false;});
   };
 }
 renderCuentaBtns();
@@ -1226,8 +1352,9 @@ if(supabase){
     sesionActual=data.session;renderCuentaBtns();
     if(sesionActual)cargarDatosNube();
   });
-  supabase.auth.onAuthStateChange((_event,session)=>{
+  supabase.auth.onAuthStateChange((event,session)=>{
     sesionActual=session;renderCuentaBtns();
+    if(event==='PASSWORD_RECOVERY'){abrirNuevaPassword();return;}
     if(session)cargarDatosNube();
   });
 }
@@ -1236,7 +1363,7 @@ if(supabase){
 (function init(){
   const datos=ls.get('cbPersDatos');
   if(datos&&datos.cats&&datos.cats.length){CATS=datos.cats;BANCO=datos.banco||{};CONF_PODERES=datos.poderes||{};}
-  pintarConfig();pintarChipsCats();
+  pintarConfig();pintarChipsCats();pintarInicio();
   const prev=ls.get('cbPersJuego');
   if(prev&&prev.equipos&&prev.equipos.length&&!prev.fin){
     const c=modal(`<div class="cab" style="${cv('#6C3BF4')}"><span class="ic">↩️</span><h2>Partida sin terminar</h2></div>
