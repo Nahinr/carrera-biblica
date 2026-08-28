@@ -52,6 +52,19 @@ Definido en [`supabase/schema.sql`](supabase/schema.sql):
 políticas en el mismo momento en que la creas. Una tabla sin RLS con la anon
 key dando vueltas en el cliente es 100% pública para leer/escribir.
 
+**Verificado en producción (28-ago-2026)**, con peticiones REST directas
+contra el proyecto real (dos cuentas de prueba, luego borradas):
+
+- Lectura y escritura anónimas (sin sesión) a `user_game_data` →
+  `401 permission denied for table user_game_data`.
+- Un usuario autenticado intentando escribir en la fila de **otro**
+  `user_id` → `403 new row violates row-level security policy`.
+- Un usuario autenticado leyendo la tabla **sin filtro** (`select=*` sin
+  `.eq(...)`) → solo recibe su propia fila, nunca las de otras cuentas.
+
+Estas tres pruebas son la validación real de que ni la anon key pública ni
+una cuenta comprometida de otro usuario alcanzan para leer datos ajenos.
+
 ## 4. Autenticación
 
 - Se usa Supabase Auth con **correo + contraseña** (sin roles especiales de
@@ -60,13 +73,25 @@ key dando vueltas en el cliente es 100% pública para leer/escribir.
 - El formulario exige un mínimo de 8 caracteres en el navegador; el
   `README.md` recomienda reforzarlo también del lado de Supabase, junto con:
   - Confirmación de correo obligatoria (evita cuentas falsas/de un solo uso).
-  - Protección contra contraseñas filtradas (HaveIBeenPwned) — se activa con
-    un interruptor en el dashboard de Supabase.
+    **Verificado en producción** (28-ago-2026): una cuenta sin confirmar
+    recibe `email_not_confirmed` al intentar iniciar sesión.
+  - Protección contra contraseñas filtradas (HaveIBeenPwned) — **solo
+    disponible en planes Pro de Supabase en adelante**; en el plan gratis el
+    dashboard rechaza el interruptor con "available on Pro Plans and up".
+    Mientras el proyecto esté en el plan gratis, se compensa con
+    `PASS_DEBILES`/`esPasswordDebil()` en `src/main.js`: una lista corta de
+    contraseñas comunes/filtradas (p. ej. `password123`, `qwerty123`) que el
+    juego rechaza en el navegador antes de siquiera llamar a Supabase. No
+    reemplaza una verificación real contra una base de datos de miles de
+    millones de contraseñas filtradas, pero bloquea gratis los casos más
+    obvios. Si el proyecto pasa a un plan de pago, activar el interruptor
+    real de Supabase y esta lista pueden convivir sin problema.
   - Rate limiting de Auth (viene activado por defecto en Supabase — no
     desactivarlo).
   - `Site URL` / `Redirect URLs` restringidos al dominio real de GitHub Pages
     (y `localhost` en desarrollo), para que los enlaces de confirmación o
     recuperación de contraseña no puedan apuntar a un dominio ajeno.
+    **Verificado**: Site URL configurado a la URL real de GitHub Pages.
 - Supabase JS guarda la sesión (JWT) en `localStorage` del navegador — es el
   comportamiento estándar de la librería; el token de acceso expira solo y se
   renueva automáticamente mientras la sesión siga activa.

@@ -1137,7 +1137,32 @@ function renderCuentaBtns(){
     b.textContent=txt;b.onclick=abrirCuenta;
   });
 }
+/* Lista corta de contraseñas extremadamente comunes/filtradas.
+   Supabase puede revisar contra HaveIBeenPwned (protección real y mucho más
+   completa), pero esa función es solo para planes Pro en adelante. Esta lista
+   es un mínimo gratuito para bloquear los casos más obvios (ver SECURITY.md). */
+const PASS_DEBILES=new Set([
+  'password','password1','password123','12345678','123456789','1234567890',
+  '123456','1234567','111111','000000','11111111','12341234','qwerty123',
+  'qwertyui','qwerty12','1q2w3e4r','iloveyou','letmein','trustno1','admin123',
+  'welcome1','sunshine','superman','football','baseball','dragon123','monkey123',
+  'abc123456','abcd1234','password12','contrasena','contraseña','clave1234',
+  '12345678910','asdfghjk','asdf1234','changeme','changeme1','p@ssword',
+  'p@ssw0rd','passw0rd','qazwsx123','zxcvbnm12','starwars1'
+]);
+function esPasswordDebil(pass,email){
+  const p=pass.toLowerCase().trim();
+  if(PASS_DEBILES.has(p))return true;
+  if(email&&p===email.split('@')[0].toLowerCase())return true;
+  if(/^([a-z0-9])\1{5,}$/.test(p))return true; // ej: "aaaaaaaa"
+  if(/^(0123456789|1234567890|01234567|12345678){1,}/.test(p))return true;
+  return false;
+}
 async function crearCuenta(email,password,onError){
+  if(esPasswordDebil(password,email)){
+    onError&&onError('Esa contraseña es demasiado común/filtrada. Elige una distinta.');
+    return;
+  }
   if(!supabase){onError&&onError('La sincronización en la nube no está configurada todavía.');return;}
   const {data,error}=await supabase.auth.signUp({email,password});
   if(error){onError&&onError(error.message);return;}

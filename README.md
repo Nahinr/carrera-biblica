@@ -48,9 +48,16 @@ habrá inicio de sesión ni sincronización en la nube (todo queda en
    habilitado (viene así por defecto).
 4. Ve a **Authentication → Settings** (o **Policies**, según la versión del
    dashboard) y revisa/activa, recomendado para producción:
-   - **Confirm email** (ON) — evita cuentas falsas creadas al vuelo.
-   - **Leaked password protection** (ON) — bloquea contraseñas ya filtradas
-     (usa la base de datos de HaveIBeenPwned).
+   - **Confirm email** (ON) — evita cuentas falsas creadas al vuelo. **Ya
+     verificado en producción: activo.**
+   - **Leaked password protection** — bloquea contraseñas ya filtradas usando
+     HaveIBeenPwned. **Solo disponible en planes Pro en adelante de Supabase**
+     (en el plan gratis, "Attack Protection" muestra el interruptor pero lo
+     rechaza con "available on Pro Plans and up"). Mientras el proyecto esté
+     en el plan gratis, esto se compensa con una lista corta de contraseñas
+     comunes/filtradas que el propio juego rechaza antes de llamar a Supabase
+     (`PASS_DEBILES` en `src/main.js`) — no es tan completo como
+     HaveIBeenPwned, pero bloquea los casos más obvios sin costo.
    - Una política de contraseña de **mínimo 8 caracteres** (el formulario del
      juego ya exige 8 como mínimo en el navegador; esto lo refuerza también en
      el servidor).
