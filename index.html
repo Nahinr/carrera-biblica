@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!--
+  Content-Security-Policy restrictiva:
+  - script-src 'self': ningún script externo ni inline; todo el JS viene empaquetado por Vite.
+  - style-src necesita 'unsafe-inline' porque el juego pinta colores por equipo con
+    element.style.cssText en JS (no hay forma de evitarlo sin reescribir todo el motor visual);
+    esto NO habilita ejecución de scripts, solo estilos.
+  - connect-src limita las peticiones de red a este mismo origen y a *.supabase.co.
+-->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self' https://*.supabase.co; base-uri 'self'; form-action 'self'; object-src 'none'">
+<meta name="referrer" content="strict-origin-when-cross-origin">
+<title>Carrera Bíblica — Personajes, animales y lugares</title>
+</head>
+<body>
+
+<!-- ============ CONFIGURACIÓN ============ -->
+<div class="pantalla" id="pConfig">
+  <div class="top">
+    <div class="logo"><span class="em">🏁</span><h1>Carrera Bíblica</h1><span class="sello">Personajes y lugares</span></div>
+    <div class="der">
+      <button class="b3 pale chico" id="btnCuenta">Iniciar sesión</button>
+      <button class="b3 pale chico" id="btnAdmin1">Preguntas</button>
+    </div>
+  </div>
+  <div class="grid-cfg">
+    <div>
+      <div class="card" style="margin-bottom:22px">
+        <h2>Equipos</h2><div class="sub">Ponle nombre y escoge su ficha</div>
+        <div id="listaEquipos"></div>
+        <button class="b3 pale chico" id="btnAddEq">+ Agregar equipo</button>
+      </div>
+      <div class="card">
+        <h2>Categorías de esta noche</h2><div class="sub">Toca para prender o apagar</div>
+        <div class="chips" id="chipsCats"></div>
+        <p class="nota" style="margin-top:16px">Las <b>abiertas</b> dan el punto a cualquier equipo, no solo al del turno.</p>
+      </div>
+    </div>
+    <div>
+      <div class="card" style="margin-bottom:22px">
+        <h2>La partida</h2><div class="sub">Reglas del juego</div>
+        <div class="campo"><label>Rondas (= espacios hasta la meta)</label><input type="number" id="inpRondas" value="8" min="3" max="20"></div>
+        <div class="campo"><label>Equipo que inicia</label><select id="selInicia"></select></div>
+        <div class="campo"><label>Puntos por acierto</label><input type="number" id="inpPts" value="10" min="1" max="100"></div>
+        <div class="campo"><label>Opciones</label><div class="chips">
+          <button class="chip on" id="chipCasillas" style="background:var(--violeta)">Poderes y bloqueos</button>
+          <button class="chip on" id="chipSonido" style="background:var(--celeste)">Sonido</button>
+        </div></div>
+        <button class="b3" id="btnIniciar" style="width:100%;--c:var(--menta);--d:var(--menta-d)">Comenzar juego</button>
+      </div>
+      <div class="card">
+        <h2>Cómo funciona</h2><div class="sub">En dos líneas</div>
+        <p class="nota">Una <b>ronda</b> es una vuelta completa: cada equipo elige categoría una vez.<br><br>
+        Al acertar, el equipo gana puntos y elige un <b>número tapado</b>. Detrás hay un poder escondido: avanzar, quedarse, retroceder, un escudo o un bloqueo. Nadie sabe cuál hasta que lo destapa.<br><br>
+        Si apagas los poderes, cada acierto avanza siempre 1 espacio.<br><br>
+        Los <b>puntos</b> miden cuánto saben; la <b>pista</b> mide quién va ganando la carrera.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ JUEGO ============ -->
+<div class="pantalla oculto" id="pJuego">
+  <div class="turnera" id="turnera">
+    <div class="ava" id="turnoEm">🚢</div>
+    <div><div class="lb">Turno de</div><div class="nm" id="turnoNom">Equipo 1</div></div>
+    <div class="der">
+      <span class="contador">Ronda <span id="rondaN">1</span>/<span id="rondaT">8</span></span>
+      <span class="contador">Turno <span id="turnoN">1</span>/<span id="turnoT">3</span></span>
+      <button class="b3 chico pale" id="btnAdmin2">Preguntas</button>
+      <button class="b3 chico pale" id="btnPoderes">Poderes</button>
+      <button class="b3 chico pale" id="btnPanelMod">Ajustes</button>
+      <button class="b3 chico pale" id="btnTerminar">Terminar</button>
+    </div>
+  </div>
+  <div class="equipos" id="equipos"></div>
+  <div class="tit-sec">Elige categoría</div>
+  <div class="cats" id="cats"></div>
+  <div class="modp oculto" id="panelMod">
+    <div class="tit-sec">Ajustes manuales</div>
+    <div id="modFilas"></div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:14px">
+      <button class="mini" id="btnSaltar">Saltar turno</button>
+      <button class="mini" id="btnRondaMas">+1 ronda</button>
+      <button class="mini" id="btnReiniciar">Reiniciar partida</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ ADMIN ============ -->
+<div class="pantalla oculto" id="pAdmin">
+  <div class="top">
+    <div class="logo"><span class="em">✏️</span><h1>Preguntas</h1></div>
+    <div class="der">
+      <button class="b3 pale chico" id="btnCuenta2">Iniciar sesión</button>
+      <button class="b3 pale chico" id="btnExportar">Descargar</button>
+      <button class="b3 pale chico" id="btnImportar">Cargar</button>
+      <button class="b3 pale chico" id="btnEditarPoderes">Poderes</button>
+      <button class="b3 pale chico" id="btnFabrica">Restaurar original</button>
+      <button class="b3 chico" id="btnVolver">Volver</button>
+    </div>
+  </div>
+  <div class="grid-adm">
+    <div class="card">
+      <h2>Categorías</h2><div class="sub" id="subCats">—</div>
+      <div id="adminCats"></div>
+      <button class="b3 chico" id="btnNuevaCat" style="width:100%;--c:var(--menta);--d:var(--menta-d)">+ Nueva categoría</button>
+    </div>
+    <div class="card" id="adminDetalle"></div>
+  </div>
+  <input type="file" id="fileImport" accept="application/json" class="oculto">
+</div>
+
+<div id="modales"></div>
+
+<script type="module" src="/src/main.js"></script>
+</body>
+</html>

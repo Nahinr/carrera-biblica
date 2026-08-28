@@ -1,0 +1,18 @@
+{
+  "name": "carrera-biblica",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Juego de trivia bíblica para grupos, con cuentas de usuario (Supabase) para guardar bancos de preguntas propios.",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.45.4"
+  },
+  "devDependencies": {
+    "vite": "^8.2.2"
+  }
+}
