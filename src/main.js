@@ -854,9 +854,7 @@ $('#btnTerminar').onclick=()=>terminar();
 let adminK=null,editIdx=null,volverA='pConfig';
 $('#btnAdmin1').onclick=()=>{volverA='pConfig';abrirAdmin();};
 $('#btnAdmin2').onclick=()=>{volverA='pJuego';abrirAdmin();};
-const irAAdminDesdeInicio=()=>{volverA='pInicio';abrirAdmin();};
-$('#btnAdmin0').onclick=irAAdminDesdeInicio;
-$('#btnAdminFooter').onclick=irAAdminDesdeInicio;
+$('#btnAdmin0').onclick=()=>{volverA='pInicio';abrirAdmin();};
 $('#btnVolver').onclick=()=>{
   irA(volverA);
   if(volverA==='pConfig')pintarChipsCats();
@@ -1187,7 +1185,7 @@ async function cargarDatosNube(){
 function renderCuentaBtns(){
   const activo=Boolean(sesionActual);
   const txt=activo?('👤 '+sesionActual.user.email):'Iniciar sesión';
-  ['#btnCuenta','#btnCuenta2','#btnCuenta0','#btnCuentaFooter'].forEach(sel=>{
+  ['#btnCuenta','#btnCuenta2','#btnCuenta0'].forEach(sel=>{
     const b=$(sel);if(!b)return;
     b.textContent=txt;b.onclick=abrirCuenta;
   });
