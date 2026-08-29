@@ -376,6 +376,7 @@ function pintarInicio(){
 }
 $('#btnJugarInicio').onclick=()=>irA('pConfig');
 $('#btnJugarFinal').onclick=()=>irA('pConfig');
+$('#btnJugarHeader').onclick=()=>irA('pConfig');
 $('#btnInicioDesdeConfig').onclick=()=>{pintarInicio();irA('pInicio');};
 $('#chipCasillas').onclick=e=>{S.usarCasillas=!S.usarCasillas;e.target.classList.toggle('on',S.usarCasillas);
   e.target.setAttribute('aria-pressed',String(S.usarCasillas));
@@ -853,7 +854,9 @@ $('#btnTerminar').onclick=()=>terminar();
 let adminK=null,editIdx=null,volverA='pConfig';
 $('#btnAdmin1').onclick=()=>{volverA='pConfig';abrirAdmin();};
 $('#btnAdmin2').onclick=()=>{volverA='pJuego';abrirAdmin();};
-$('#btnAdmin0').onclick=()=>{volverA='pInicio';abrirAdmin();};
+const irAAdminDesdeInicio=()=>{volverA='pInicio';abrirAdmin();};
+$('#btnAdmin0').onclick=irAAdminDesdeInicio;
+$('#btnAdminFooter').onclick=irAAdminDesdeInicio;
 $('#btnVolver').onclick=()=>{
   irA(volverA);
   if(volverA==='pConfig')pintarChipsCats();
@@ -1069,11 +1072,6 @@ function editorCategoria(cat){
   };
 }
 $('#btnNuevaCat').onclick=()=>editorCategoria(null);
-$('#btnExportar').onclick=()=>{
-  const blob=new Blob([JSON.stringify({cats:CATS,banco:BANCO,poderes:CONF_PODERES},null,1)],{type:'application/json'});
-  const a=document.createElement('a');a.href=URL.createObjectURL(blob);
-  a.download='carrera-biblica-preguntas.json';a.click();
-};
 $('#btnEditarPoderes').onclick=()=>editorPoderes();
 function editorPoderes(){
   const c=modal(`<div class="cab" style="${cv('#6C3BF4')}"><span class="ic">🎲</span><h2>Poderes y bloqueos</h2>
@@ -1117,22 +1115,6 @@ $('#btnFabrica').onclick=()=>{
   if(!confirm('Esto reemplaza TODAS las categorías y preguntas por las originales del juego. Se perderá lo que hayas agregado. ¿Continuar?'))return;
   CATS=JSON.parse(JSON.stringify(CATS_DEF));BANCO=JSON.parse(JSON.stringify(BANCO_DEF));CONF_PODERES={};
   adminK=CATS[0].k;editIdx=null;guardarDatos();pintarAdminCats();pintarDetalle();
-};
-$('#btnImportar').onclick=()=>$('#fileImport').click();
-$('#fileImport').onchange=e=>{
-  const f=e.target.files[0];if(!f)return;
-  const r=new FileReader();
-  r.onload=()=>{
-    try{
-      const d=JSON.parse(r.result);
-      if(!d.cats||!d.banco)throw new Error('El archivo no tiene el formato esperado.');
-      CATS=d.cats;BANCO=d.banco;CONF_PODERES=d.poderes||{};adminK=CATS.length?CATS[0].k:null;
-      guardarDatos();pintarAdminCats();pintarDetalle();
-      alert('Respaldo cargado: '+CATS.length+' categorías.');
-    }catch(err){alert('No se pudo leer el archivo. '+err.message);}
-    e.target.value='';
-  };
-  r.readAsText(f);
 };
 
 /* ============ CUENTA (Supabase Auth + sincronización en la nube) ============
@@ -1205,7 +1187,7 @@ async function cargarDatosNube(){
 function renderCuentaBtns(){
   const activo=Boolean(sesionActual);
   const txt=activo?('👤 '+sesionActual.user.email):'Iniciar sesión';
-  ['#btnCuenta','#btnCuenta2'].forEach(sel=>{
+  ['#btnCuenta','#btnCuenta2','#btnCuenta0','#btnCuentaFooter'].forEach(sel=>{
     const b=$(sel);if(!b)return;
     b.textContent=txt;b.onclick=abrirCuenta;
   });

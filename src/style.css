@@ -254,6 +254,21 @@ textarea{line-height:1.5}
 .logo-btn{background:none;border:none;padding:0;text-align:left}
 .logo-btn:hover .sello{filter:brightness(1.08)}
 
+/* Header propio de la página de inicio: fijo arriba, siempre con acceso a
+   cuenta/preguntas/jugar sin tener que volver a subir. Reusa .top/.logo/.der
+   (el mismo lenguaje de las demás pantallas) en vez de inventar uno nuevo. */
+.header-inicio{position:sticky;top:0;z-index:20;background:#fff;
+  margin-bottom:0;padding:14px 22px;box-shadow:0 1px 0 var(--linea)}
+.nav-inicio{display:flex;gap:22px;margin-left:28px}
+.nav-inicio a{color:var(--tinta2);font-weight:700;font-size:14px;text-decoration:none}
+.nav-inicio a:hover{color:var(--violeta)}
+@media(max-width:760px){
+  .nav-inicio{display:none}
+  .header-inicio .sello{display:none}
+  .header-inicio .der{width:100%}
+  .header-inicio .der .b3{flex:1 1 auto}
+}
+
 /* Degradado con los dos colores primarios de la propia marca (no un bloque
    plano de un solo color, que es el patrón más genérico/gastado de este
    tipo de página). El texto pasa a blanco por el contraste contra el
@@ -346,9 +361,18 @@ textarea{line-height:1.5}
 .sec-cta-final{background:var(--violeta);padding:56px 22px;text-align:center}
 .sec-cta-final .b3{margin-top:20px;font-size:16px;padding:16px 30px}
 
-.pie-inicio{display:flex;justify-content:center;align-items:center;gap:18px;padding:26px 22px 40px;
-  color:var(--tinta2);font-weight:700;font-size:13px}
-.link-pie{color:var(--tinta2);font-weight:700;font-size:13px;text-decoration:underline;text-underline-offset:2px}
-.link-pie:hover{color:var(--tinta)}
+.footer-inicio{background:#fff;border-top:1px solid var(--linea);padding:44px 22px 26px}
+.footer-in{max-width:1180px;margin:0 auto;display:grid;grid-template-columns:1.6fr 1fr 1fr;gap:32px}
+@media(max-width:720px){.footer-in{grid-template-columns:1fr;gap:26px}}
+.footer-marca .logo{margin-bottom:10px}
+.footer-marca .logo h1{font-size:18px}
+.footer-marca p{margin:0;font-size:13.5px;color:var(--tinta2);font-weight:600;line-height:1.55;max-width:320px}
+.footer-links{display:flex;flex-direction:column;gap:10px}
+.footer-tit{font-size:11.5px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:var(--tinta2);margin-bottom:2px}
+.link-pie{color:var(--tinta);font-weight:700;font-size:14px;text-align:left}
+.footer-links a{color:var(--tinta);font-weight:700;font-size:14px;text-decoration:none}
+.link-pie:hover,.footer-links a:hover{color:var(--violeta)}
+.footer-copy{max-width:1180px;margin:34px auto 0;padding-top:20px;border-top:1px solid var(--linea);
+  color:var(--tinta2);font-weight:600;font-size:12.5px;text-align:center}
 
 @media(prefers-reduced-motion:reduce){*{animation:none !important;transition:none !important}}

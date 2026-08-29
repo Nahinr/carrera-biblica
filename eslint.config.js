@@ -27,9 +27,6 @@ export default [
         requestAnimationFrame: 'readonly',
         AudioContext: 'readonly',
         webkitAudioContext: 'readonly',
-        Blob: 'readonly',
-        URL: 'readonly',
-        FileReader: 'readonly',
       },
     },
     rules: {

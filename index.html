@@ -19,6 +19,18 @@
 
 <!-- ============ INICIO ============ -->
 <div class="pantalla-ancha" id="pInicio">
+  <header class="top header-inicio">
+    <div class="logo"><span class="em">🏁</span><h1>Carrera Bíblica</h1><span class="sello">Personajes y lugares</span></div>
+    <nav class="nav-inicio">
+      <a href="#como-funciona">Cómo funciona</a>
+      <a href="#categorias">Categorías</a>
+    </nav>
+    <div class="der">
+      <button class="b3 pale chico" id="btnCuenta0">Iniciar sesión</button>
+      <button class="b3 pale chico" id="btnAdmin0">Preguntas</button>
+      <button class="b3 chico" id="btnJugarHeader" style="--c:var(--menta);--d:var(--menta-d)">Jugar gratis</button>
+    </div>
+  </header>
   <section class="hero">
     <div class="hero-in">
       <div class="hero-tx">
@@ -69,8 +81,8 @@
     </div>
   </section>
 
-  <section class="sec-cats">
-    <h2 class="tit-2">Las categorías de esta noche</h2>
+  <section class="sec-cats" id="categorias">
+    <h2 class="tit-2">Algunas categorías</h2>
     <p class="sub-2" id="statPreguntas">Listas para usar, sin preparar nada.</p>
     <div class="cats-tira" id="catsTira"></div>
   </section>
@@ -100,9 +112,24 @@
     <button class="b3" id="btnJugarFinal" style="--c:#fff;--d:#D9D6EE;color:var(--violeta)">🚀 Jugar gratis ahora</button>
   </section>
 
-  <footer class="pie-inicio">
-    <span>🏁 Carrera Bíblica</span>
-    <button class="link-pie" id="btnAdmin0">Panel de preguntas</button>
+  <footer class="footer-inicio">
+    <div class="footer-in">
+      <div class="footer-marca">
+        <div class="logo"><span class="em">🏁</span><h1>Carrera Bíblica</h1></div>
+        <p>El juego de preguntas bíblicas para tu grupo de jóvenes, célula o familia.</p>
+      </div>
+      <nav class="footer-links">
+        <span class="footer-tit">El juego</span>
+        <a href="#como-funciona">Cómo funciona</a>
+        <a href="#categorias">Categorías</a>
+      </nav>
+      <nav class="footer-links">
+        <span class="footer-tit">Cuenta</span>
+        <button class="link-pie" id="btnCuentaFooter">Iniciar sesión</button>
+        <button class="link-pie" id="btnAdminFooter">Panel de preguntas</button>
+      </nav>
+    </div>
+    <div class="footer-copy">© 2026 Carrera Bíblica. Hecho para noches de trivia bíblica en grupo.</div>
   </footer>
 </div>
 
@@ -187,8 +214,6 @@
     <div class="logo"><span class="em">✏️</span><h1>Preguntas</h1></div>
     <div class="der">
       <button class="b3 pale chico" id="btnCuenta2">Iniciar sesión</button>
-      <button class="b3 pale chico" id="btnExportar">Descargar</button>
-      <button class="b3 pale chico" id="btnImportar">Cargar</button>
       <button class="b3 pale chico" id="btnEditarPoderes">Poderes</button>
       <button class="b3 pale chico" id="btnFabrica">Restaurar original</button>
       <button class="b3 chico" id="btnVolver">Volver</button>
@@ -202,7 +227,6 @@
     </div>
     <div class="card" id="adminDetalle"></div>
   </div>
-  <input type="file" id="fileImport" accept="application/json" class="oculto">
 </div>
 
 <div id="modales"></div>
