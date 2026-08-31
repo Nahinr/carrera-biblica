@@ -27,6 +27,8 @@ export default [
         requestAnimationFrame: 'readonly',
         AudioContext: 'readonly',
         webkitAudioContext: 'readonly',
+        performance: 'readonly',
+        IntersectionObserver: 'readonly',
       },
     },
     rules: {

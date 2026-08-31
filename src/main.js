@@ -370,9 +370,50 @@ function pintarInicio(){
       <span>${esc(v.n)}<small>${v.tipo==='moderador'?'libre del moderador':total+' preguntas'}</small></span>`;
     tira.appendChild(d);
   });
-  const totalPreguntas=Object.values(BANCO).reduce((s,a)=>s+(a?a.length:0),0);
   const stat=$('#statPreguntas');
-  if(stat)stat.textContent=`${totalPreguntas}+ preguntas listas, en ${CATS.length} categorías.`;
+  if(stat){
+    const totalPreguntas=Object.values(BANCO).reduce((s,a)=>s+(a?a.length:0),0);
+    /* Si el contador ya se animó una vez (usuario que vuelve al inicio tras
+       editar preguntas), no lo reiniciamos en 0 — el observer de abajo ya
+       hizo "unobserve" y no volvería a dispararse. */
+    const inicial=contadorPreguntasAnimado?totalPreguntas:0;
+    stat.innerHTML=`<span id="statNum">${inicial}</span>+ preguntas listas, en ${CATS.length} categorías.`;
+  }
+}
+let contadorPreguntasAnimado=false;
+function animarContadorPreguntas(){
+  if(contadorPreguntasAnimado)return;
+  contadorPreguntasAnimado=true;
+  const el=$('#statNum');
+  if(!el)return;
+  const total=Object.values(BANCO).reduce((s,a)=>s+(a?a.length:0),0);
+  const dur=900,t0=performance.now();
+  const paso=t=>{
+    const p=Math.min(1,(t-t0)/dur);
+    el.textContent=Math.round(total*(1-Math.pow(1-p,3))); // ease-out cúbico
+    if(p<1)requestAnimationFrame(paso);
+  };
+  requestAnimationFrame(paso);
+}
+/* ============ REVELADO AL HACER SCROLL ============
+   Marca .visible en los bloques .reveal-solo/.reveal-group de la página de
+   inicio cuando entran en pantalla (ver el CSS de .reveal-* para el porqué).
+   Si el navegador no soporta IntersectionObserver, se muestran de una vez:
+   nunca deben quedar invisibles por falta de soporte. */
+function activarRevelado(){
+  const els=document.querySelectorAll('.reveal-solo,.reveal-group');
+  if(!els.length)return;
+  const revelar=el=>{
+    el.classList.add('visible');
+    if(el.id==='statPreguntas')animarContadorPreguntas();
+  };
+  if(!('IntersectionObserver' in window)){els.forEach(revelar);return;}
+  const obs=new IntersectionObserver(entries=>{
+    entries.forEach(entry=>{
+      if(entry.isIntersecting){revelar(entry.target);obs.unobserve(entry.target);}
+    });
+  },{threshold:.15,rootMargin:'0px 0px -40px 0px'});
+  els.forEach(el=>obs.observe(el));
 }
 $('#btnJugarInicio').onclick=()=>irA('pConfig');
 $('#btnJugarFinal').onclick=()=>irA('pConfig');
@@ -796,8 +837,15 @@ function terminar(ganador){
       <div style="font-size:76px;animation:pop .5s cubic-bezier(.2,1.6,.4,1)">${fichaDe(g.ficha).e}</div>
       <div style="font-size:clamp(28px,4.5vw,46px);font-weight:800;color:${g.color}">${esc(g.nombre)}</div>
       <div class="nota">Llegó más lejos en la carrera</div></div>`;
+  /* El podio se revela de atrás hacia adelante (último lugar primero, el
+     ganador al final) para crear la misma "cuenta regresiva hacia el
+     ganador" de los podios de Kahoot y compañía — el segundo estallido de
+     confeti más abajo está calculado para llegar justo cuando aparece el
+     primer lugar. */
+  const retraso=i=>(orden.length-1-i)*130;
   orden.forEach((e,i)=>{
-    html+=`<div class="pod ${i===0?'p1':''}" style="${cv(e.color)}"><span class="pos">${i+1}</span>
+    html+=`<div class="pod ${i===0?'p1':''}" style="${cv(e.color)};animation-delay:${retraso(i)}ms">
+      <span class="pos">${i+1}</span>
       <span class="ava">${fichaDe(e.ficha).e}</span><span class="nm">${esc(e.nombre)}</span>
       <span class="sc"><b>${e.puntos} pts</b>${e.aciertos} aciertos · espacio ${e.pos}</span></div>`;
   });
@@ -807,6 +855,11 @@ function terminar(ganador){
   const c=modal(html,720);
   confeti(110);
   bip(523,.15);setTimeout(()=>bip(659,.15),160);setTimeout(()=>bip(784,.35),320);
+  setTimeout(()=>{
+    confeti(70);bip(880,.3);
+    const fila1=c.querySelector('.pod.p1');
+    if(fila1){fila1.classList.add('brillar');setTimeout(()=>fila1.classList.remove('brillar'),600);}
+  },retraso(0)+420);
   c.querySelector('#btnSeguir').onclick=()=>{
     S.fin=false;S.rondas+=2;$('#rondaT').textContent=S.rondas;
     cerrarModal();pintarEquipos();pintarCats();guardar();
@@ -1343,7 +1396,7 @@ if(supabase){
 (function init(){
   const datos=ls.get('cbPersDatos');
   if(datos&&datos.cats&&datos.cats.length){CATS=datos.cats;BANCO=datos.banco||{};CONF_PODERES=datos.poderes||{};}
-  pintarConfig();pintarChipsCats();pintarInicio();
+  pintarConfig();pintarChipsCats();pintarInicio();activarRevelado();
   const prev=ls.get('cbPersJuego');
   if(prev&&prev.equipos&&prev.equipos.length&&!prev.fin){
     const c=modal(`<div class="cab" style="${cv('#6C3BF4')}"><span class="ic">↩️</span><h2>Partida sin terminar</h2></div>
