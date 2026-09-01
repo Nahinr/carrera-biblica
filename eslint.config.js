@@ -24,6 +24,8 @@ export default [
         confirm: 'readonly',
         setTimeout: 'readonly',
         clearTimeout: 'readonly',
+        setInterval: 'readonly',
+        clearInterval: 'readonly',
         requestAnimationFrame: 'readonly',
         AudioContext: 'readonly',
         webkitAudioContext: 'readonly',

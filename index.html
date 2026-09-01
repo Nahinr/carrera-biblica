@@ -161,7 +161,12 @@
           <button class="chip on" id="chipCasillas" aria-pressed="true" style="background:var(--violeta)">Poderes y bloqueos</button>
           <button class="chip on" id="chipSonido" aria-pressed="true" style="background:var(--celeste)">Sonido</button>
           <button class="chip" id="chipTextoGrande" aria-pressed="false" title="Agranda preguntas, nombres y puntajes para salones grandes">🔍 Texto grande</button>
+          <button class="chip" id="chipCronometro" aria-pressed="false">⏱️ Cronómetro</button>
         </div></div>
+        <div class="campo oculto" id="campoCronoSeg"><label>Segundos por pregunta</label>
+          <input type="number" id="inpCronoSeg" value="20" min="5" max="120">
+          <p class="nota" style="margin-top:6px">Solo agrega presión: al llegar a 0 suena una alarma, pero tú sigues decidiendo quién ganó el punto.</p>
+        </div>
         <button class="b3" id="btnIniciar" style="width:100%;--c:var(--menta);--d:var(--menta-d)">Comenzar juego</button>
       </div>
       <div class="card">

@@ -163,6 +163,11 @@ textarea{line-height:1.5}
 .hoja .cab .ic{font-size:30px}
 .hoja .cab h2{font-size:18px}
 .hoja .cab .modo{margin-left:auto;background:rgba(255,255,255,.2);border-radius:99px;padding:6px 14px;font-size:12px;font-weight:700}
+.hoja .cab .crono{display:flex;align-items:center;justify-content:center;width:38px;height:38px;border-radius:50%;
+  background:rgba(255,255,255,.25);font-size:16px;font-weight:800;font-variant-numeric:tabular-nums}
+.hoja .cab .crono.crono-urgente{background:var(--coral);animation:crono-lat .5s ease-in-out infinite}
+.hoja .cab .crono.crono-fin{background:var(--coral);animation:none}
+@keyframes crono-lat{0%,100%{transform:scale(1)}50%{transform:scale(1.14)}}
 .hoja .cont{padding:26px 30px 28px}
 .pregunta{font-size:clamp(25px,3.4vw,40px);font-weight:800;line-height:1.25;margin:2px 0 24px;letter-spacing:-.02em}
 .ayuda{background:#FFF6DE;border-radius:14px;padding:13px 18px;font-size:16px;font-weight:700;

@@ -281,7 +281,7 @@ const armarMazo=()=>armarMazoPura(CAT_PODERES,CONF_PODERES);
 let CATS=JSON.parse(JSON.stringify(CATS_DEF));
 let BANCO=JSON.parse(JSON.stringify(BANCO_DEF));
 let S={equipos:[],rondas:8,ronda:1,turno:0,turnos:0,ptsAcierto:10,
-       usarCasillas:true,sonido:true,usadas:{},casillasUsadas:[],mazo:[],fin:false};
+       usarCasillas:true,sonido:true,cronometro:0,usadas:{},casillasUsadas:[],mazo:[],fin:false};
 let cfgEquipos=[{nombre:'Equipo 1',ficha:'arca'},{nombre:'Equipo 2',ficha:'corona'},{nombre:'Equipo 3',ficha:'vasija'}];
 
 const $=s=>document.querySelector(s);
@@ -461,10 +461,17 @@ function aplicarTextoGrande(){
 }
 $('#chipTextoGrande').onclick=()=>{textoGrande=!textoGrande;ls.set('cbTextoGrande',textoGrande);aplicarTextoGrande();};
 aplicarTextoGrande();
+$('#chipCronometro').onclick=e=>{
+  const on=!e.target.classList.contains('on');
+  e.target.classList.toggle('on',on);e.target.setAttribute('aria-pressed',String(on));
+  e.target.style.background=on?'var(--coral)':'';
+  $('#campoCronoSeg').classList.toggle('oculto',!on);
+};
 $('#btnIniciar').onclick=()=>{
   if(!CATS.some(c=>c.activa)){alert('Prende al menos una categoría.');return;}
   S.rondas=Math.max(3,Math.min(20,+$('#inpRondas').value||8));
   S.ptsAcierto=Math.max(1,+$('#inpPts').value||10);
+  S.cronometro=$('#chipCronometro').classList.contains('on')?Math.max(5,Math.min(120,+$('#inpCronoSeg').value||20)):0;
   S.equipos=cfgEquipos.map((e,i)=>({id:i,nombre:e.nombre||('Equipo '+(i+1)),ficha:e.ficha,color:colorEq(i),
     pos:0,posVis:0,puntos:0,aciertos:0,bloqueado:false,escudo:false,doble:false}));
   S.turno=+$('#selInicia').value||0;S.turnos=0;S.ronda=1;S.fin=false;S.usadas={};S.casillasUsadas=[];S.mazo=armarMazo();
@@ -616,7 +623,36 @@ function modal(html,ancho,opts){
   hoja.focus();
   return hoja;
 }
+/* Cronómetro opcional por pregunta: solo agrega presión (tic-tac + alarma al
+   llegar a 0). Nunca bloquea nada — el moderador sigue pudiendo asignar el
+   punto antes o después de que suene, exactamente como sin cronómetro. Vive
+   fuera de modal()/cerrarModal() como un intervalo único porque cualquier
+   cierre de modal (resolver, "nadie acertó", pasar turno, etc.) debe
+   apagarlo, sin importar cuál de esos caminos lo cerró. */
+let cronoInterval=null;
+function detenerCrono(){
+  if(cronoInterval){clearInterval(cronoInterval);cronoInterval=null;}
+}
+function iniciarCrono(segundos){
+  detenerCrono();
+  const el=$('#crono');
+  if(!el)return;
+  let restante=segundos;
+  el.textContent=restante;
+  cronoInterval=setInterval(()=>{
+    restante--;
+    if(restante<=0){
+      el.textContent='0';el.classList.add('crono-fin');
+      if(S.sonido)bip(180,.5,'square');
+      detenerCrono();
+      return;
+    }
+    el.textContent=restante;
+    if(restante<=3)el.classList.add('crono-urgente');
+  },1000);
+}
 function cerrarModal(){
+  detenerCrono();
   $('#modales').innerHTML='';
   modalCerrable=false;
   if(modalUltimoFoco&&document.contains(modalUltimoFoco))modalUltimoFoco.focus();
@@ -666,10 +702,12 @@ function abrirPregunta(k){
   }
   const c=modal(`
     <div class="cab" style="${cv(cat.color)}"><span class="ic">${cat.ic}</span><h2>${esc(cat.n)}</h2>
+      ${S.cronometro>0?`<span class="crono" id="crono" title="Segundos restantes">${S.cronometro}</span>`:''}
       <span class="modo">${cat.modo==='abierto'?'Punto abierto':esc(S.equipos[S.turno].nombre)}</span></div>
     <div class="cont">
     ${cuerpo}${respuesta}
     <div class="asignar"><div class="lb">¿Quién gana el punto?</div><div class="eq-btns" id="eqBtns"></div></div></div>`);
+  if(S.cronometro>0)iniciarCrono(S.cronometro);
 
   let factor=1;
   if(cat.tipo==='pistas'){
