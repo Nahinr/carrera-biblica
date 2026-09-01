@@ -6,6 +6,7 @@ import {
   cantPoder as cantPoderPura, totalMazo as totalMazoPura, armarMazo as armarMazoPura,
   esPasswordDebil, mensajeError, EMAIL_RE,
 } from './gameLogic.js';
+import { generarCodigo, generarIdEquipo, abrirCanal, enviar, cerrarCanal } from './multiplayer.js';
 
 const FICHAS=[
  {id:'arca',e:'🚢',n:'Arca'},{id:'corona',e:'👑',n:'Corona'},{id:'vasija',e:'🏺',n:'Vasija'},
@@ -281,8 +282,23 @@ const armarMazo=()=>armarMazoPura(CAT_PODERES,CONF_PODERES);
 let CATS=JSON.parse(JSON.stringify(CATS_DEF));
 let BANCO=JSON.parse(JSON.stringify(BANCO_DEF));
 let S={equipos:[],rondas:8,ronda:1,turno:0,turnos:0,ptsAcierto:10,
-       usarCasillas:true,sonido:true,cronometro:0,usadas:{},casillasUsadas:[],mazo:[],fin:false};
+       usarCasillas:true,sonido:true,cronometro:0,multi:false,usadas:{},casillasUsadas:[],mazo:[],fin:false};
 let cfgEquipos=[{nombre:'Equipo 1',ficha:'arca'},{nombre:'Equipo 2',ficha:'corona'},{nombre:'Equipo 3',ficha:'vasija'}];
+
+/* Estado del multijugador — vive FUERA de S a propósito: contiene el canal
+   de Realtime (un objeto vivo con sockets y funciones) que nunca debe
+   intentar guardarse en localStorage junto al resto de la partida. */
+const multi={
+  activo:false,      // true tanto para el host como para cada equipo unido
+  esHost:false,
+  canal:null,
+  codigo:null,
+  equipoLocalId:null, // solo en la vista de un equipo: su propio id
+  equipos:[],          // host: equipos que se han unido, en espera o ya jugando
+  buzzAbierto:false,
+  buzzGanadorId:null,
+  descartados:[],       // ids de equipos ya descartados en la pregunta actual
+};
 
 const $=s=>document.querySelector(s);
 const fichaDe=id=>FICHAS.find(f=>f.id===id)||FICHAS[0];
@@ -481,7 +497,7 @@ $('#btnIniciar').onclick=()=>{
   bip(523,.1);setTimeout(()=>bip(784,.16),120);
 };
 function irA(id){
-  ['pInicio','pConfig','pJuego','pAdmin'].forEach(p=>$('#'+p).classList.toggle('oculto',p!==id));
+  ['pInicio','pConfig','pJuego','pAdmin','pMulti','pMultiHost','pMultiPlayer'].forEach(p=>$('#'+p).classList.toggle('oculto',p!==id));
   window.scrollTo(0,0);
 }
 
@@ -568,11 +584,24 @@ function animarTodos(cb){
 }
 function pintarTurno(){
   const eq=S.equipos[S.turno];
-  $('#turnera').style.cssText=cv(eq.color);
-  $('#turnoEm').textContent=fichaDe(eq.ficha).e;
-  $('#turnoNom').textContent=eq.nombre;
   $('#rondaN').textContent=S.ronda;
-  $('#turnoN').textContent=(S.turnos%S.equipos.length)+1;
+  if(S.multi){
+    /* En multiplayer no hay "de quién es el turno": cualquier equipo puede
+       tocar el timbre en cualquier pregunta. La barra muestra el código de
+       la sesión en su lugar. */
+    $('#turnera').style.cssText=cv('#6C3BF4');
+    $('#turnoEm').textContent='📡';
+    $('#turnoLb').textContent='Sesión en vivo';
+    $('#turnoNom').textContent='Código: '+multi.codigo;
+    $('#turnoContador').classList.add('oculto');
+  }else{
+    $('#turnera').style.cssText=cv(eq.color);
+    $('#turnoEm').textContent=fichaDe(eq.ficha).e;
+    $('#turnoLb').textContent='Turno de';
+    $('#turnoNom').textContent=eq.nombre;
+    $('#turnoContador').classList.remove('oculto');
+    $('#turnoN').textContent=(S.turnos%S.equipos.length)+1;
+  }
 }
 function pintarCats(){
   const c=$('#cats');c.innerHTML='';
@@ -583,7 +612,7 @@ function pintarCats(){
     b.className='cat';b.disabled=!inf&&usadas>=total;b.style.cssText=cv(v.color);
     b.innerHTML=`<span class="ic">${v.ic}</span>
       <span class="nm">${esc(v.n)}</span>
-      <span class="qd">${v.modo==='abierto'?'Punto abierto':'Solo el turno'} · ${inf?'sin límite':(total-usadas)}</span>`;
+      <span class="qd">${S.multi||v.modo==='abierto'?'Punto abierto':'Solo el turno'} · ${inf?'sin límite':(total-usadas)}</span>`;
     b.onclick=()=>abrirPregunta(v.k);
     c.appendChild(b);
   });
@@ -700,14 +729,20 @@ function abrirPregunta(k){
         <div class="tx">${esc(it.n)}</div></div>`;
     }
   }
+  const modoTxt=S.multi?'👥 Multijugador':(cat.modo==='abierto'?'Punto abierto':esc(S.equipos[S.turno].nombre));
   const c=modal(`
     <div class="cab" style="${cv(cat.color)}"><span class="ic">${cat.ic}</span><h2>${esc(cat.n)}</h2>
       ${S.cronometro>0?`<span class="crono" id="crono" title="Segundos restantes">${S.cronometro}</span>`:''}
-      <span class="modo">${cat.modo==='abierto'?'Punto abierto':esc(S.equipos[S.turno].nombre)}</span></div>
+      <span class="modo">${modoTxt}</span></div>
     <div class="cont">
+    ${S.multi?'<p class="nota" id="mpEstadoHost" style="text-align:center;font-weight:800;margin-bottom:14px"></p>':''}
     ${cuerpo}${respuesta}
     <div class="asignar"><div class="lb">¿Quién gana el punto?</div><div class="eq-btns" id="eqBtns"></div></div></div>`);
   if(S.cronometro>0)iniciarCrono(S.cronometro);
+  if(S.multi){
+    multi.buzzAbierto=true;multi.buzzGanadorId=null;multi.descartados=[];
+    transmitirEstado();actualizarBuzzUI();
+  }
 
   let factor=1;
   if(cat.tipo==='pistas'){
@@ -729,13 +764,18 @@ function abrirPregunta(k){
   const ba=c.querySelector('#btnAyuda');
   if(ba)ba.onclick=()=>{c.querySelector('#ayuda').classList.remove('oculto');ba.remove();};
   const btns=c.querySelector('#eqBtns');
-  (cat.modo==='abierto'?S.equipos:[S.equipos[S.turno]]).forEach(eq=>{
+  /* En multiplayer cualquier equipo puede ganar cualquier pregunta (el
+     timbre ya resolvió el "de quién es el turno"), así que se ignora
+     cat.modo y siempre se listan todos los equipos. */
+  (S.multi||cat.modo==='abierto'?S.equipos:[S.equipos[S.turno]]).forEach(eq=>{
     const b=document.createElement('button');b.className='eq-btn';b.style.cssText=cv(eq.color);
+    if(S.multi&&eq.multiId)b.dataset.multiid=eq.multiId;
     b.innerHTML=`<span class="em">${fichaDe(eq.ficha).e}</span>${esc(eq.nombre)}`;
     b.onclick=()=>{if(btns.dataset.listo)return;btns.dataset.listo='1';
       btns.querySelectorAll('button').forEach(x=>x.disabled=true);resolver(eq.id,factor);};
     btns.appendChild(b);
   });
+  if(S.multi)actualizarBuzzUI();
   if(respuesta){
     const vr=document.createElement('button');vr.className='eq-btn';vr.style.cssText='--c:#7A7392;--d:#544E68';
     vr.innerHTML='<span class="em">👁️</span>Ver respuesta';
@@ -744,8 +784,25 @@ function abrirPregunta(k){
   }
   const nadie=document.createElement('button');nadie.className='eq-btn solo-x';nadie.style.cssText=cv('#FF5C7A');
   nadie.title='Nadie acertó';nadie.innerHTML='✖';
-  nadie.onclick=()=>{if(btns.dataset.listo)return;btns.dataset.listo='1';
-    bip(220,.25,'sawtooth');cerrarModal();pasarTurno();};
+  nadie.onclick=()=>{
+    /* En multiplayer, si ya hay un equipo que tocó el timbre, "✖" significa
+       "ese equipo respondió mal": se descarta y se reabre el timbre para los
+       demás, SIN cerrar la tarjeta — se sigue en la misma pregunta hasta que
+       alguien acierte o ya no quede nadie por intentar. */
+    if(S.multi&&multi.buzzGanadorId){
+      multi.descartados.push(multi.buzzGanadorId);
+      multi.buzzGanadorId=null;
+      const nadieMas=S.equipos.every(e=>multi.descartados.includes(e.multiId));
+      if(!nadieMas){
+        multi.buzzAbierto=true;transmitirEstado();actualizarBuzzUI();
+        bip(300,.15,'sawtooth');
+        return;
+      }
+      multi.buzzAbierto=false;
+    }
+    if(btns.dataset.listo)return;btns.dataset.listo='1';
+    bip(220,.25,'sawtooth');cerrarModal();pasarTurno();
+  };
   btns.appendChild(nadie);
   pintarCats();guardar();
 }
@@ -896,6 +953,7 @@ function pasarTurno(){
   S.ronda=Math.floor(S.turnos/S.equipos.length)+1;
   if(S.ronda>S.rondas){terminar();return;}
   pintarEquipos();pintarTurno();pintarCats();pintarMod();guardar();
+  if(S.multi){multi.buzzAbierto=false;multi.buzzGanadorId=null;transmitirEstado();}
 }
 function revisarFin(){
   const g=S.equipos.find(e=>e.pos>=S.rondas);
@@ -904,6 +962,7 @@ function revisarFin(){
 }
 function terminar(ganador){
   S.fin=true;
+  if(S.multi){multi.buzzAbierto=false;multi.buzzGanadorId=null;transmitirEstado('fin');}
   const orden=[...S.equipos].sort((a,b)=>b.pos-a.pos||b.puntos-a.puntos);
   const g=ganador||orden[0];
   let html=`<div class="cab" style="${cv(g.color)}"><span class="ic">🏆</span><h2>¡Resultado final!</h2></div><div class="cont">
@@ -939,8 +998,12 @@ function terminar(ganador){
   c.querySelector('#btnSeguir').onclick=()=>{
     S.fin=false;S.rondas+=2;$('#rondaT').textContent=S.rondas;
     cerrarModal();pintarEquipos();pintarCats();guardar();
+    if(S.multi)transmitirEstado('jugando');
   };
-  c.querySelector('#btnNuevo').onclick=()=>{ls.del('cbPersJuego');location.reload();};
+  c.querySelector('#btnNuevo').onclick=()=>{
+    if(S.multi)cerrarSesionMulti();
+    ls.del('cbPersJuego');location.reload();
+  };
 }
 /* Usa el "share sheet" nativo del celular si existe (ahí sale WhatsApp junto
    con las demás apps instaladas); si no, abre un enlace de wa.me con el
@@ -980,6 +1043,10 @@ function pintarMod(){
         else if(a==='bloq')eq.bloqueado=!eq.bloqueado;
         else if(a==='esc')eq.escudo=!eq.escudo;
         pintarMod();guardar();pintarEquipos();animarTodos();
+        /* Este panel es justo la salvación manual si a un equipo se le va la
+           señal en plena partida: hay que avisarle a los demás celulares de
+           inmediato, no esperar a la próxima pregunta. */
+        if(S.multi)transmitirEstado();
       };
     });
     c.appendChild(d);
@@ -989,8 +1056,206 @@ $('#btnPoderes').onclick=()=>verPoderes();
 $('#btnPanelMod').onclick=()=>$('#panelMod').classList.toggle('oculto');
 $('#btnSaltar').onclick=()=>pasarTurno();
 $('#btnRondaMas').onclick=()=>{S.rondas++;$('#rondaT').textContent=S.rondas;pintarEquipos();guardar();};
-$('#btnReiniciar').onclick=()=>{if(confirm('¿Reiniciar la partida desde cero?')){ls.del('cbPersJuego');location.reload();}};
+$('#btnReiniciar').onclick=()=>{if(confirm('¿Reiniciar la partida desde cero?')){if(S.multi)cerrarSesionMulti();ls.del('cbPersJuego');location.reload();}};
 $('#btnTerminar').onclick=()=>terminar();
+
+/* ============ MULTIJUGADOR ============
+   Cada equipo se conecta desde su propio celular y usa un botón de timbre en
+   vez de compartir una sola pantalla. El anfitrión (esta misma pantalla de
+   juego, S.multi=true) sigue eligiendo categorías y decidiendo quién ganó el
+   punto con los mismos botones de siempre — el timbre solo le avisa quién
+   tocó primero. Sin tabla nueva en Supabase: todo viaja por un canal
+   Realtime efímero cuyo nombre es el código de la sesión (ver
+   src/multiplayer.js para el porqué de ese diseño). */
+$('#btnMultiHeader').onclick=()=>{
+  $('#multiSinSupabase').textContent=supabase?'':'El multijugador necesita que este sitio tenga Supabase conectado. Por ahora no está disponible.';
+  irA('pMulti');
+};
+$('#btnInicioDesdeMulti').onclick=()=>irA('pInicio');
+
+function cerrarSesionMulti(){
+  cerrarCanal(multi.canal);
+  multi.activo=false;multi.esHost=false;multi.canal=null;multi.codigo=null;multi.equipoLocalId=null;
+  multi.equipos=[];multi.buzzAbierto=false;multi.buzzGanadorId=null;multi.descartados=[];
+}
+function transmitirEstado(faseForzada){
+  if(!multi.activo||!multi.esHost||!multi.canal)return;
+  const origen=S.multi?S.equipos:multi.equipos;
+  const equiposOut=origen.map(e=>({
+    id:S.multi?e.multiId:e.id,nombre:e.nombre,ficha:e.ficha,color:e.color,
+    pos:e.pos||0,puntos:e.puntos||0,
+  }));
+  enviar(multi.canal,'estado',{
+    fase:faseForzada||(S.fin?'fin':(S.multi?'jugando':'espera')),
+    equipos:equiposOut,rondas:S.rondas,ronda:S.ronda,
+    buzzAbierto:multi.buzzAbierto,buzzGanadorId:multi.buzzGanadorId,descartados:multi.descartados,
+  });
+}
+function pintarListaGenerica(sel,equipos,conPuntos){
+  const cont=$(sel);if(!cont)return;
+  cont.innerHTML='';
+  (equipos||[]).forEach(e=>{
+    const d=document.createElement('div');d.className='equipo-fila';
+    d.innerHTML=`<span class="em">${fichaDe(e.ficha).e}</span><span class="nm">${esc(e.nombre)}</span>
+      ${conPuntos?`<span class="pt">${e.puntos} pts · espacio ${e.pos}</span>`:''}`;
+    cont.appendChild(d);
+  });
+}
+/* Actualiza (si está abierta) la tarjeta de pregunta con quién tocó el
+   timbre primero. No deshabilita ningún botón de equipo: el moderador puede
+   seguir dándole el punto a cualquiera, el timbre es solo información. */
+function actualizarBuzzUI(){
+  const estadoEl=$('#mpEstadoHost');
+  if(!estadoEl)return;
+  document.querySelectorAll('#eqBtns .eq-btn').forEach(b=>b.classList.remove('gano-timbre'));
+  if(multi.buzzGanadorId){
+    const eq=S.equipos.find(e=>e.multiId===multi.buzzGanadorId);
+    estadoEl.innerHTML=`🎉 <b>${esc(eq?eq.nombre:'Un equipo')}</b> tocó primero`;
+    if(eq){const btn=document.querySelector(`#eqBtns [data-multiid="${eq.multiId}"]`);if(btn)btn.classList.add('gano-timbre');}
+  }else if(multi.buzzAbierto){
+    estadoEl.textContent='🔔 Esperando que algún equipo toque el timbre...';
+  }else{
+    estadoEl.textContent='';
+  }
+}
+
+/* ---- Anfitrión: crear sesión y sala de espera ---- */
+function crearSesionHost(){
+  if(!supabase){alert('El multijugador necesita Supabase conectado.');return;}
+  multi.activo=true;multi.esHost=true;multi.codigo=generarCodigo();
+  multi.equipos=[];multi.buzzAbierto=false;multi.buzzGanadorId=null;multi.descartados=[];
+  multi.canal=abrirCanal(multi.codigo);
+  multi.canal.on('broadcast',{event:'unirse'},({payload})=>onUnirseHost(payload));
+  multi.canal.on('broadcast',{event:'buzz'},({payload})=>onBuzzHost(payload));
+  multi.canal.subscribe(status=>{
+    if(status==='SUBSCRIBED'){
+      $('#codigoGrande').textContent=multi.codigo;
+      $('#urlUnirse').textContent=location.host+location.pathname;
+      pintarListaEquiposHost();
+      irA('pMultiHost');
+    }else if(status==='CHANNEL_ERROR'||status==='TIMED_OUT'){
+      alert('No se pudo crear la sesión. Revisa tu conexión e intenta de nuevo.');
+    }
+  });
+}
+$('#btnSerHost').onclick=crearSesionHost;
+function onUnirseHost(payload){
+  if(!payload||!payload.id||!payload.nombre)return;
+  if(multi.equipos.some(e=>e.id===payload.id))return; // reintento de red del mismo equipo
+  const fichasUsadas=new Set(multi.equipos.map(e=>e.ficha));
+  const fichaLibre=FICHAS.find(f=>!fichasUsadas.has(f.id))||FICHAS[multi.equipos.length%FICHAS.length];
+  let nombre=String(payload.nombre).trim().slice(0,24)||('Equipo '+(multi.equipos.length+1));
+  if(multi.equipos.some(e=>e.nombre===nombre))nombre+=' ('+(multi.equipos.length+1)+')';
+  multi.equipos.push({id:payload.id,nombre,ficha:fichaLibre.id,color:colorEq(multi.equipos.length),pos:0,puntos:0});
+  pintarListaEquiposHost();
+  transmitirEstado();
+}
+function pintarListaEquiposHost(){
+  pintarListaGenerica('#listaEquiposHost',multi.equipos,false);
+  $('#subEquiposConectados').textContent=multi.equipos.length?`${multi.equipos.length} equipo(s) conectado(s)`:'Esperando a que se unan...';
+  $('#btnComenzarMulti').disabled=multi.equipos.length<2;
+}
+$('#btnCancelarHost').onclick=()=>{cerrarSesionMulti();irA('pMulti');};
+$('#btnComenzarMulti').onclick=()=>{
+  if(multi.equipos.length<2)return;
+  const c=modal(`<div class="cab" style="${cv('#6C3BF4')}"><span class="ic">⚙️</span><h2>Reglas de la partida</h2></div>
+    <div class="cont">
+      <div class="campo"><label>Rondas (= espacios hasta la meta)</label><input type="number" id="mpRondas" value="8" min="3" max="20"></div>
+      <div class="campo"><label>Puntos por acierto</label><input type="number" id="mpPts" value="10" min="1" max="100"></div>
+      <div class="campo"><label>Opciones</label><div class="chips">
+        <button class="chip on" id="mpChipPoderes" aria-pressed="true" style="background:var(--violeta)">Poderes y bloqueos</button>
+      </div></div>
+      <button class="b3" id="mpEmpezar" style="width:100%;--c:var(--menta);--d:var(--menta-d)">Comenzar</button>
+    </div>`,460,{cerrable:true});
+  let poderesOn=true;
+  c.querySelector('#mpChipPoderes').onclick=e=>{poderesOn=!poderesOn;e.target.classList.toggle('on',poderesOn);
+    e.target.setAttribute('aria-pressed',String(poderesOn));e.target.style.background=poderesOn?'var(--violeta)':'';};
+  c.querySelector('#mpEmpezar').onclick=()=>{
+    S.rondas=Math.max(3,Math.min(20,+c.querySelector('#mpRondas').value||8));
+    S.ptsAcierto=Math.max(1,+c.querySelector('#mpPts').value||10);
+    S.usarCasillas=poderesOn;S.multi=true;S.cronometro=0;
+    S.equipos=multi.equipos.map((e,i)=>({id:i,nombre:e.nombre,ficha:e.ficha,color:e.color,
+      pos:0,posVis:0,puntos:0,aciertos:0,bloqueado:false,escudo:false,doble:false,multiId:e.id}));
+    S.turno=0;S.turnos=0;S.ronda=1;S.fin=false;S.usadas={};S.casillasUsadas=[];S.mazo=armarMazo();
+    cerrarModal();
+    ls.del('cbPersJuego'); // una sesión multijugador nunca debe ofrecerse como "reanudable"
+    irA('pJuego');
+    $('#rondaT').textContent=S.rondas;$('#turnoT').textContent=S.equipos.length;
+    pintarEquipos();pintarCats();pintarTurno();pintarMod();
+    transmitirEstado('jugando');
+    bip(523,.1);setTimeout(()=>bip(784,.16),120);
+  };
+};
+
+/* ---- Equipo: unirse con un código y tocar el timbre ---- */
+function mostrarPasoMulti(paso){
+  ['Unirse','Espera','Buzzer','Fin'].forEach(p=>$('#mpPaso'+p).classList.toggle('oculto',p.toLowerCase()!==paso));
+}
+$('#btnUnirmeIr').onclick=()=>{
+  const cod=$('#inpCodigoUnirse').value.trim().toUpperCase();
+  if(cod.length!==5){alert('El código tiene 5 letras/números.');return;}
+  $('#inpCodigoJugador').value=cod;
+  irA('pMultiPlayer');mostrarPasoMulti('unirse');
+};
+$('#btnUnirmeFinal').onclick=()=>{
+  const cod=$('#inpCodigoJugador').value.trim().toUpperCase();
+  const nombre=$('#inpNombreJugador').value.trim();
+  if(cod.length!==5){$('#mpUnirseAviso').textContent='Escribe el código de 5 caracteres.';return;}
+  if(!nombre){$('#mpUnirseAviso').textContent='Ponle nombre a tu equipo.';return;}
+  if(!supabase){$('#mpUnirseAviso').textContent='El multijugador necesita Supabase conectado.';return;}
+  multi.activo=true;multi.esHost=false;multi.codigo=cod;multi.equipoLocalId=generarIdEquipo();
+  multi.canal=abrirCanal(cod);
+  multi.canal.on('broadcast',{event:'estado'},({payload})=>onEstadoJugador(payload));
+  multi.canal.subscribe(status=>{
+    if(status==='SUBSCRIBED'){
+      enviar(multi.canal,'unirse',{id:multi.equipoLocalId,nombre});
+      mostrarPasoMulti('espera');$('#mpUnirseAviso').textContent='';
+    }else if(status==='CHANNEL_ERROR'||status==='TIMED_OUT'){
+      $('#mpUnirseAviso').textContent='No se pudo conectar. Revisa el código y tu conexión.';
+    }
+  });
+};
+function onEstadoJugador(payload){
+  if(!payload)return;
+  if(payload.fase==='espera'){
+    mostrarPasoMulti('espera');
+    const yo=payload.equipos.find(e=>e.id===multi.equipoLocalId);
+    if(yo){$('#mpFichaEspera').textContent=fichaDe(yo.ficha).e;$('#mpNombreEspera').textContent=yo.nombre;}
+    pintarListaGenerica('#listaEquiposJugador',payload.equipos,false);
+  }else if(payload.fase==='jugando'){
+    mostrarPasoMulti('buzzer');
+    $('#mpEstadoRonda').textContent=`Ronda ${payload.ronda} de ${payload.rondas}`;
+    const yaDescartado=payload.descartados.includes(multi.equipoLocalId);
+    const yoGane=payload.buzzGanadorId===multi.equipoLocalId;
+    const btn=$('#btnBuzz');
+    btn.disabled=!payload.buzzAbierto||yaDescartado;
+    btn.classList.toggle('buzz-abierto',payload.buzzAbierto&&!yaDescartado);
+    btn.classList.toggle('buzz-gane',yoGane);
+    const msg=$('#mpBuzzMsg');
+    if(yoGane)msg.textContent='¡Tocaste primero! Responde en voz alta.';
+    else if(yaDescartado)msg.textContent='Ya respondiste esta pregunta. Esperando la siguiente.';
+    else if(payload.buzzGanadorId)msg.textContent='Otro equipo tocó primero...';
+    else if(payload.buzzAbierto)msg.textContent='¡Toca ya si sabes la respuesta!';
+    else msg.textContent='Esperando la próxima pregunta...';
+    pintarListaGenerica('#listaEquiposJuego',[...payload.equipos].sort((a,b)=>b.pos-a.pos||b.puntos-a.puntos),true);
+  }else if(payload.fase==='fin'){
+    mostrarPasoMulti('fin');
+    pintarListaGenerica('#mpFinLista',[...payload.equipos].sort((a,b)=>b.pos-a.pos||b.puntos-a.puntos),true);
+  }
+}
+function onBuzzHost(payload){
+  if(!multi.buzzAbierto||!payload||!payload.id)return;
+  if(multi.descartados.includes(payload.id))return;
+  multi.buzzAbierto=false;multi.buzzGanadorId=payload.id;
+  actualizarBuzzUI();transmitirEstado();
+  if(S.sonido)bip(660,.08);
+}
+$('#btnBuzz').onclick=()=>{
+  if($('#btnBuzz').disabled)return;
+  enviar(multi.canal,'buzz',{id:multi.equipoLocalId,ts:Date.now()});
+  $('#btnBuzz').disabled=true; // optimista: se corrige solo con el próximo "estado" si algo cambió
+};
+$('#btnSalirMulti').onclick=()=>{cerrarSesionMulti();irA('pInicio');};
 
 /* ============ ADMIN ============ */
 let adminK=null,editIdx=null,volverA='pConfig';
@@ -1486,8 +1751,20 @@ if(supabase){
   const datos=ls.get('cbPersDatos');
   if(datos&&datos.cats&&datos.cats.length){CATS=datos.cats;BANCO=datos.banco||{};CONF_PODERES=datos.poderes||{};}
   pintarConfig();pintarChipsCats();pintarInicio();activarRevelado();
+  /* Enlace directo para unirse (?unir=CODIGO): salta derecho al formulario
+     de unión con el código ya escrito, para compartir un link en vez de
+     tener que dictar el código letra por letra. */
+  const codigoUrl=new URLSearchParams(location.search).get('unir');
+  if(codigoUrl){
+    $('#inpCodigoJugador').value=codigoUrl.trim().toUpperCase().slice(0,5);
+    irA('pMultiPlayer');mostrarPasoMulti('unirse');
+  }
   const prev=ls.get('cbPersJuego');
-  if(prev&&prev.equipos&&prev.equipos.length&&!prev.fin){
+  /* Una partida multijugador no se puede "reanudar": el canal de Realtime no
+     sobrevive a un recargo de página, y reconstruirlo con todos los equipos
+     ya conectados es un caso que no vale la pena resolver en esta primera
+     versión — el anfitrión simplemente crea una sesión nueva. */
+  if(prev&&prev.equipos&&prev.equipos.length&&!prev.fin&&!prev.multi){
     const c=modal(`<div class="cab" style="${cv('#6C3BF4')}"><span class="ic">↩️</span><h2>Partida sin terminar</h2></div>
       <div class="cont"><p class="nota">Ronda ${prev.ronda} de ${prev.rondas}, con ${prev.equipos.length} equipos.</p>
       <div style="display:flex;gap:12px;margin-top:20px;flex-wrap:wrap">

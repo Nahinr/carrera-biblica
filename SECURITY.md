@@ -104,9 +104,13 @@ una cuenta comprometida de otro usuario alcanzan para leer datos ajenos.
   el JS (incluida la librería de Supabase) va empaquetado por Vite y servido
   desde el mismo origen. Esto elimina por completo el riesgo de que un script
   de un CDN externo sea comprometido y afecte este sitio.
-- `connect-src 'self' https://*.supabase.co`: el navegador solo puede llamar
-  a este mismo origen y a Supabase. Ninguna otra petición de red es posible
-  aunque se inyectara HTML malicioso.
+- `connect-src 'self' https://*.supabase.co wss://*.supabase.co`: el
+  navegador solo puede llamar a este mismo origen y a Supabase. Ninguna otra
+  petición de red es posible aunque se inyectara HTML malicioso. El `wss://`
+  es explícito a propósito: en la práctica el navegador NO trata un origen
+  `https://` como si ya cubriera su equivalente `wss://` (lo confirmamos al
+  construir el multijugador — sin esta línea, Supabase Realtime quedaba
+  bloqueado por el propio CSP).
 - `object-src 'none'`, `base-uri 'self'`, `form-action 'self'`: cierran rutas
   clásicas de explotación de XSS.
 - `style-src` incluye `'unsafe-inline'` porque el motor del juego pinta
@@ -121,7 +125,31 @@ mitigarían clickjacking— no se pueden aplicar aquí. Si esto llega a importar
 más adelante, la solución es mover el hosting a Cloudflare Pages o Netlify,
 donde sí se pueden definir cabeceras personalizadas.
 
-## 6. Prevención de XSS en el contenido
+## 6. Multijugador: canales Realtime efímeros
+
+El modo multijugador (cada equipo se conecta desde su propio celular y usa
+un botón de timbre) usa **Supabase Realtime** en vez de una tabla nueva:
+
+- **Sin tabla, sin RLS que mantener**: el canal es de difusión efímera —
+  existe mientras haya alguien conectado y desaparece solo. No queda ningún
+  registro guardado en ningún lado después de que termina la partida.
+- **El código de sesión ES el control de acceso**, igual que el PIN de un
+  Kahoot: 5 caracteres de un alfabeto de 32 (sin `0/O/1/I/L`, para que no se
+  confundan al leerlos en voz alta) ≈ 33 millones de combinaciones posibles.
+  Cualquiera que conozca el código puede unirse o escuchar ese canal
+  mientras dura la sesión — es una limitación de diseño inherente a "unirse
+  con un código corto" (la misma que tiene Kahoot), no algo que se pueda
+  evitar sin pedirle una cuenta a cada jugador, que es justo la fricción que
+  este modo busca evitar.
+- **No hace falta iniciar sesión** para usar Realtime aquí: se confirmó en
+  la práctica (dos pestañas independientes intercambiando mensajes solo con
+  la anon key) que los canales de difusión pública funcionan sin
+  autenticación en este proyecto. Ni el anfitrión ni los equipos manejan la
+  `service_role key` en ningún momento — no la necesitan.
+- **Nada sensible viaja por el canal**: solo nombres de equipo (los que el
+  propio jugador escribe), fichas, puntajes y posiciones en el tablero.
+
+## 7. Prevención de XSS en el contenido
 
 Todo el texto dinámico que se inserta en el DOM (nombres de equipo, preguntas,
 respuestas, categorías — incluyendo lo que llega desde la nube una vez que el
@@ -131,7 +159,7 @@ datos que vienen de Supabase que a los que ya vivían en `localStorage`: es el
 mismo pipeline de renderizado para ambos casos, así que no hay una ruta nueva
 sin escapar.
 
-## 7. Manejo de secretos en el repositorio
+## 8. Manejo de secretos en el repositorio
 
 - `.env`, `.env.local` y cualquier `.env.*.local` están en `.gitignore`: las
   llaves reales de Supabase nunca se comitean.
@@ -141,14 +169,14 @@ sin escapar.
 - `dist/` y `node_modules/` están en `.gitignore` — el repositorio solo
   contiene código fuente, nunca artefactos de build ni dependencias.
 
-## 8. Dependencias
+## 9. Dependencias
 
 - `.github/dependabot.yml` mantiene actualizadas automáticamente las
   dependencias de `npm` y las de GitHub Actions (ambas con PRs semanales).
 - El workflow de CI (`ci.yml`) corre `npm audit --audit-level=high` en cada
   Pull Request, para detectar vulnerabilidades conocidas antes de fusionar.
 
-## 9. Lo que TÚ debes hacer (no automatizable desde aquí)
+## 10. Lo que TÚ debes hacer (no automatizable desde aquí)
 
 Por diseño, hay pasos que requieren tu propia cuenta/credenciales y que un
 asistente no debe (ni puede, de forma segura) hacer por ti:

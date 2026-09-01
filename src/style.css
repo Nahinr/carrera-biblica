@@ -429,4 +429,26 @@ body.texto-grande .cat .nm{font-size:22px}
 body.texto-grande .pod .nm{font-size:22px}
 body.texto-grande .pod .sc b{font-size:26px}
 
+/* ============ MULTIJUGADOR ============ */
+.codigo-grande{font-size:clamp(44px,10vw,80px);font-weight:800;letter-spacing:.14em;color:var(--violeta);
+  margin:8px 0;font-family:ui-monospace,monospace}
+.equipo-fila{display:flex;align-items:center;gap:12px;background:var(--nube);border-radius:14px;
+  padding:11px 16px;margin-bottom:8px;font-weight:700}
+.equipo-fila .em{font-size:26px}
+.equipo-fila .nm{flex:1;font-size:15px}
+.equipo-fila .pt{font-size:13px;color:var(--tinta2);font-weight:700}
+.equipo-fila .punto-en{width:9px;height:9px;border-radius:50%;background:var(--menta);flex:0 0 auto}
+.equipo-fila.descartado{opacity:.45}
+.equipo-fila.gano-timbre{box-shadow:0 0 0 2px var(--sol)}
+
+.btn-buzz{width:min(240px,70vw);aspect-ratio:1/1;border-radius:50%;background:var(--coral);color:#fff;
+  font-size:22px;font-weight:800;line-height:1.3;box-shadow:0 8px 0 var(--coral-d);margin:14px auto;display:block}
+.btn-buzz:active:not(:disabled){transform:translateY(6px);box-shadow:0 2px 0 var(--coral-d)}
+.btn-buzz:disabled{background:var(--nube2);color:var(--tinta2);box-shadow:0 8px 0 var(--linea);cursor:not-allowed}
+.btn-buzz.buzz-abierto{animation:buzz-pulso 1s ease-in-out infinite}
+@keyframes buzz-pulso{0%,100%{transform:scale(1)}50%{transform:scale(1.05)}}
+.btn-buzz.buzz-gane{background:var(--menta);box-shadow:0 8px 0 var(--menta-d)}
+
+.mp-crono-host{display:flex;align-items:center;gap:8px;font-weight:800;color:var(--tinta2);font-size:13px;margin-bottom:10px}
+
 @media(prefers-reduced-motion:reduce){*{animation:none !important;transition:none !important}}

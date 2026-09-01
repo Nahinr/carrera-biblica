@@ -31,6 +31,7 @@ export default [
         webkitAudioContext: 'readonly',
         performance: 'readonly',
         IntersectionObserver: 'readonly',
+        URLSearchParams: 'readonly',
       },
     },
     rules: {

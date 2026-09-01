@@ -10,8 +10,14 @@
     element.style.cssText en JS (no hay forma de evitarlo sin reescribir todo el motor visual);
     esto NO habilita ejecución de scripts, solo estilos.
   - connect-src limita las peticiones de red a este mismo origen y a *.supabase.co.
+    Incluye wss:// además de https:// a propósito: el navegador NO trata un
+    origen https:// como si ya cubriera su equivalente wss:// (lo confirmamos
+    en la práctica: el multijugador quedaba bloqueado sin esta línea, aunque
+    en teoría la sustitución de esquema debería aplicar) — Supabase Realtime
+    (el timbre del multijugador) se conecta por WebSocket, así que hace
+    falta permitirlo explícitamente o el navegador corta la conexión.
 -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self' https://*.supabase.co; base-uri 'self'; form-action 'self'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self' https://*.supabase.co wss://*.supabase.co; base-uri 'self'; form-action 'self'; object-src 'none'">
 <meta name="referrer" content="strict-origin-when-cross-origin">
 <title>Carrera Bíblica — Personajes, animales y lugares</title>
 </head>
@@ -28,6 +34,7 @@
     <div class="der">
       <button class="b3 pale chico" id="btnCuenta0">Iniciar sesión</button>
       <button class="b3 pale chico" id="btnAdmin0">Preguntas</button>
+      <button class="b3 pale chico" id="btnMultiHeader">👥 Multijugador</button>
       <button class="b3 chico" id="btnJugarHeader" style="--c:var(--menta);--d:var(--menta-d)">Jugar gratis</button>
     </div>
   </header>
@@ -127,6 +134,88 @@
   </footer>
 </div>
 
+<!-- ============ MULTIJUGADOR: elegir anfitrión o unirse ============ -->
+<div class="pantalla oculto" id="pMulti">
+  <div class="top">
+    <button class="logo logo-btn" id="btnInicioDesdeMulti" title="Volver al inicio">
+      <span class="em">🏁</span><h1>Carrera Bíblica</h1><span class="sello">Multijugador</span>
+    </button>
+  </div>
+  <p class="nota" id="multiSinSupabase" style="text-align:center;margin-bottom:18px"></p>
+  <div class="grid-cfg">
+    <div class="card">
+      <h2>🎤 Soy el anfitrión</h2><div class="sub">Voy a moderar la partida</div>
+      <p class="nota">Se genera un código de 5 letras. Cada equipo lo usa desde su propio celular para
+        unirse y tocar el timbre — tú sigues eligiendo categorías y decidiendo quién acertó, igual que hoy.</p>
+      <button class="b3" id="btnSerHost" style="width:100%;--c:var(--menta);--d:var(--menta-d)">Crear sesión</button>
+    </div>
+    <div class="card">
+      <h2>📱 Unirme con un código</h2><div class="sub">Somos uno de los equipos</div>
+      <div class="campo"><label>Código de la sesión</label>
+        <input type="text" id="inpCodigoUnirse" maxlength="5" style="text-transform:uppercase;letter-spacing:.15em;font-weight:800;text-align:center;font-size:22px" placeholder="ABCDE"></div>
+      <button class="b3 pale" id="btnUnirmeIr" style="width:100%">Continuar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ MULTIJUGADOR: sala de espera del anfitrión ============ -->
+<div class="pantalla oculto" id="pMultiHost">
+  <div class="top">
+    <div class="logo"><span class="em">🎤</span><h1>Sala de espera</h1></div>
+    <div class="der"><button class="b3 chico pale" id="btnCancelarHost">Cancelar</button></div>
+  </div>
+  <div class="card" style="text-align:center;margin-bottom:22px">
+    <div class="sub">Código para que se unan los equipos</div>
+    <div id="codigoGrande" class="codigo-grande"></div>
+    <p class="nota">Cada equipo entra a <b id="urlUnirse"></b> y escribe este código.</p>
+  </div>
+  <div class="card">
+    <h2>Equipos conectados</h2><div class="sub" id="subEquiposConectados">Esperando a que se unan...</div>
+    <div id="listaEquiposHost"></div>
+    <button class="b3" id="btnComenzarMulti" style="width:100%;margin-top:16px;--c:var(--menta);--d:var(--menta-d)" disabled>Comenzar partida</button>
+    <p class="nota" style="margin-top:8px;text-align:center">Necesitas al menos 2 equipos conectados.</p>
+  </div>
+</div>
+
+<!-- ============ MULTIJUGADOR: pantalla del equipo (une, espera, timbre, fin) ============ -->
+<div class="pantalla oculto" id="pMultiPlayer">
+  <div class="top">
+    <div class="logo"><span class="em">📱</span><h1>Multijugador</h1></div>
+    <div class="der"><button class="b3 chico pale" id="btnSalirMulti">Salir</button></div>
+  </div>
+
+  <div class="card" id="mpPasoUnirse">
+    <h2>Únete a la partida</h2><div class="sub">Escribe el código que te dio el anfitrión</div>
+    <div class="campo"><label>Código</label>
+      <input type="text" id="inpCodigoJugador" maxlength="5" style="text-transform:uppercase;letter-spacing:.15em;font-weight:800;text-align:center;font-size:22px"></div>
+    <div class="campo"><label>Nombre de tu equipo</label><input type="text" id="inpNombreJugador" maxlength="24" placeholder="Ej.: Los Leones"></div>
+    <button class="b3" id="btnUnirmeFinal" style="width:100%;--c:var(--menta);--d:var(--menta-d)">Unirme</button>
+    <p class="nota" id="mpUnirseAviso" style="margin-top:10px"></p>
+  </div>
+
+  <div class="card oculto" id="mpPasoEspera" style="text-align:center">
+    <div style="font-size:56px" id="mpFichaEspera">🚢</div>
+    <h2 id="mpNombreEspera">Equipo</h2>
+    <p class="nota">Ya estás dentro. Esperando a que el anfitrión comience la partida...</p>
+    <div class="tit-sec" style="margin-top:18px">Equipos en la sala</div>
+    <div id="listaEquiposJugador"></div>
+  </div>
+
+  <div class="card oculto" id="mpPasoBuzzer" style="text-align:center">
+    <div class="sub" id="mpEstadoRonda"></div>
+    <button class="btn-buzz" id="btnBuzz">🔔<br>TOCAR</button>
+    <p class="nota" id="mpBuzzMsg" style="margin-top:14px;min-height:20px"></p>
+    <div class="tit-sec" style="margin-top:10px">Posiciones</div>
+    <div id="listaEquiposJuego"></div>
+  </div>
+
+  <div class="card oculto" id="mpPasoFin" style="text-align:center">
+    <div style="font-size:64px">🏆</div>
+    <h2 id="mpFinTitulo">¡Terminó la partida!</h2>
+    <div id="mpFinLista" style="margin-top:14px"></div>
+  </div>
+</div>
+
 <!-- ============ CONFIGURACIÓN ============ -->
 <div class="pantalla oculto" id="pConfig">
   <div class="top">
@@ -184,10 +273,10 @@
 <div class="pantalla oculto" id="pJuego">
   <div class="turnera" id="turnera">
     <div class="ava" id="turnoEm">🚢</div>
-    <div><div class="lb">Turno de</div><div class="nm" id="turnoNom">Equipo 1</div></div>
+    <div><div class="lb" id="turnoLb">Turno de</div><div class="nm" id="turnoNom">Equipo 1</div></div>
     <div class="der">
       <span class="contador">Ronda <span id="rondaN">1</span>/<span id="rondaT">8</span></span>
-      <span class="contador">Turno <span id="turnoN">1</span>/<span id="turnoT">3</span></span>
+      <span class="contador" id="turnoContador">Turno <span id="turnoN">1</span>/<span id="turnoT">3</span></span>
       <button class="b3 chico pale" id="btnAdmin2">Preguntas</button>
       <button class="b3 chico pale" id="btnPoderes">Poderes</button>
       <button class="b3 chico pale" id="btnPanelMod">Ajustes</button>
