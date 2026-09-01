@@ -232,22 +232,43 @@ citas:[
  {c:'Apocalipsis 16:16',d:'Nombra un lugar de batalla'}
 ]
 };
+/* `snd` es la "firma sonora" de cada poder: una lista de notas
+   [retraso_ms, frecuencia_hz, duración_s, forma_de_onda] que sonarPoder()
+   reproduce en secuencia — así cada poder se reconoce por oído antes de
+   leer el texto, en vez de compartir 3 tonos genéricos entre los 14. */
 const CAT_PODERES=[
- {id:'av1',t:'avanzar',n:1,ic:'👣',tt:'¡Avanza 1 espacio!',ds:'Un paso más cerca de la meta.',cl:'bien',def:9},
- {id:'av2',t:'avanzar',n:2,ic:'🚀',tt:'¡Avanza 2 espacios!',ds:'Buen impulso en la pista.',cl:'bien',def:4},
- {id:'av3',t:'avanzar',n:3,ic:'💫',tt:'¡Avanza 3 espacios!',ds:'La casilla más generosa del mazo.',cl:'bien',def:1},
- {id:'nada',t:'nada',ic:'🛑',tt:'No avanzas',ds:'Te quedas donde estás, pero conservas tus puntos.',cl:'neutro',def:3},
- {id:'ret1',t:'retroceder',n:1,ic:'↩️',tt:'Retrocede 1',ds:'Un paso atrás.',cl:'mal',def:2},
- {id:'ret2',t:'retroceder',n:2,ic:'⏪',tt:'Retrocede 2',ds:'Dos pasos atrás. Todavía hay tiempo.',cl:'mal',def:1},
- {id:'bloqueo',t:'bloqueo',ic:'🚧',tt:'¡Bloqueo!',ds:'Pierdes tu próximo turno. El escudo lo anula.',cl:'mal',def:2},
- {id:'escudo',t:'escudo',ic:'🛡️',tt:'¡Escudo!',ds:'Avanzas 1 y quedas protegido del próximo bloqueo.',cl:'bien',def:2},
- {id:'doble',t:'doble',ic:'✖️',tt:'¡Doble impulso!',ds:'Tu próximo acierto vale el doble en avance y en puntos.',cl:'bien',def:2},
- {id:'robar',t:'robar',ic:'🎯',tt:'¡Frena a un rival!',ds:'Avanzas 1 y eliges un equipo que retrocede 1.',cl:'bien',def:2},
- {id:'lider',t:'lider',ic:'⚔️',tt:'¡Alcanza al líder!',ds:'Avanzas 1 y el que va adelante retrocede 1.',cl:'bien',def:2},
- {id:'empate',t:'empate',ic:'🪜',tt:'¡Salto de alcance!',ds:'Te colocas junto al equipo que va justo delante de ti.',cl:'bien',def:1},
- {id:'ptsmas',t:'ptsmas',ic:'💎',tt:'¡Puntos extra!',ds:'Avanzas 1 y ganas puntos de regalo.',cl:'bien',def:1},
- {id:'ptsmenos',t:'ptsmenos',ic:'💸',tt:'Pagas con puntos',ds:'Avanzas 1 pero pierdes puntos.',cl:'mal',def:0}
+ {id:'av1',t:'avanzar',n:1,ic:'👣',tt:'¡Avanza 1 espacio!',ds:'Un paso más cerca de la meta.',cl:'bien',def:9,
+   snd:[[0,660,.1,'sine'],[90,880,.16,'sine']]},
+ {id:'av2',t:'avanzar',n:2,ic:'🚀',tt:'¡Avanza 2 espacios!',ds:'Buen impulso en la pista.',cl:'bien',def:4,
+   snd:[[0,660,.08,'sine'],[80,830,.08,'sine'],[160,988,.18,'sine']]},
+ {id:'av3',t:'avanzar',n:3,ic:'💫',tt:'¡Avanza 3 espacios!',ds:'La casilla más generosa del mazo.',cl:'bien',def:1,
+   snd:[[0,660,.07,'sine'],[70,784,.07,'sine'],[140,932,.07,'sine'],[210,1174,.22,'sine']]},
+ {id:'nada',t:'nada',ic:'🛑',tt:'No avanzas',ds:'Te quedas donde estás, pero conservas tus puntos.',cl:'neutro',def:3,
+   snd:[[0,400,.22,'triangle']]},
+ {id:'ret1',t:'retroceder',n:1,ic:'↩️',tt:'Retrocede 1',ds:'Un paso atrás.',cl:'mal',def:2,
+   snd:[[0,480,.08,'sawtooth'],[90,340,.2,'sawtooth']]},
+ {id:'ret2',t:'retroceder',n:2,ic:'⏪',tt:'Retrocede 2',ds:'Dos pasos atrás. Todavía hay tiempo.',cl:'mal',def:1,
+   snd:[[0,480,.07,'sawtooth'],[80,380,.07,'sawtooth'],[160,260,.26,'sawtooth']]},
+ {id:'bloqueo',t:'bloqueo',ic:'🚧',tt:'¡Bloqueo!',ds:'Pierdes tu próximo turno. El escudo lo anula.',cl:'mal',def:2,
+   snd:[[0,220,.09,'square'],[130,180,.24,'square']]},
+ {id:'escudo',t:'escudo',ic:'🛡️',tt:'¡Escudo!',ds:'Avanzas 1 y quedas protegido del próximo bloqueo.',cl:'bien',def:2,
+   snd:[[0,1046,.06,'sine'],[70,1568,.18,'sine']]},
+ {id:'doble',t:'doble',ic:'✖️',tt:'¡Doble impulso!',ds:'Tu próximo acierto vale el doble en avance y en puntos.',cl:'bien',def:2,
+   snd:[[0,660,.06,'triangle'],[70,988,.06,'triangle'],[140,660,.06,'triangle'],[210,988,.2,'triangle']]},
+ {id:'robar',t:'robar',ic:'🎯',tt:'¡Frena a un rival!',ds:'Avanzas 1 y eliges un equipo que retrocede 1.',cl:'bien',def:2,
+   snd:[[0,300,.06,'sawtooth'],[70,830,.14,'sine']]},
+ {id:'lider',t:'lider',ic:'⚔️',tt:'¡Alcanza al líder!',ds:'Avanzas 1 y el que va adelante retrocede 1.',cl:'bien',def:2,
+   snd:[[0,494,.07,'square'],[80,659,.07,'square'],[160,494,.18,'square']]},
+ {id:'empate',t:'empate',ic:'🪜',tt:'¡Salto de alcance!',ds:'Te colocas junto al equipo que va justo delante de ti.',cl:'bien',def:1,
+   snd:[[0,587,.06,'sine'],[90,587,.16,'sine']]},
+ {id:'ptsmas',t:'ptsmas',ic:'💎',tt:'¡Puntos extra!',ds:'Avanzas 1 y ganas puntos de regalo.',cl:'bien',def:1,
+   snd:[[0,880,.06,'sine'],[70,1109,.06,'sine'],[140,1319,.2,'sine']]},
+ {id:'ptsmenos',t:'ptsmenos',ic:'💸',tt:'Pagas con puntos',ds:'Avanzas 1 pero pierdes puntos.',cl:'mal',def:0,
+   snd:[[0,494,.1,'sawtooth'],[110,349,.22,'sawtooth']]}
 ];
+function sonarPoder(p){
+  (p.snd||[]).forEach(([retraso,frec,dur,tipo])=>setTimeout(()=>bip(frec,dur,tipo),retraso));
+}
 const poderDe=id=>CAT_PODERES.find(x=>x.id===id)||CAT_PODERES[0];
 let CONF_PODERES={};
 /* cantPoder/totalMazo/armarMazo viven en gameLogic.js como funciones puras
@@ -425,6 +446,21 @@ $('#chipCasillas').onclick=e=>{S.usarCasillas=!S.usarCasillas;e.target.classList
 $('#chipSonido').onclick=e=>{S.sonido=!S.sonido;e.target.classList.toggle('on',S.sonido);
   e.target.setAttribute('aria-pressed',String(S.sonido));
   e.target.style.background=S.sonido?'var(--celeste)':'';bip(880,.08);};
+
+/* Texto grande: preferencia personal de accesibilidad (no es parte de S,
+   la partida) — se guarda aparte y sigue activa aunque se empiece un
+   juego nuevo. */
+let textoGrande=ls.get('cbTextoGrande')||false;
+function aplicarTextoGrande(){
+  document.body.classList.toggle('texto-grande',textoGrande);
+  const b=$('#chipTextoGrande');
+  if(!b)return;
+  b.classList.toggle('on',textoGrande);
+  b.setAttribute('aria-pressed',String(textoGrande));
+  b.style.background=textoGrande?'var(--sol)':'';
+}
+$('#chipTextoGrande').onclick=()=>{textoGrande=!textoGrande;ls.set('cbTextoGrande',textoGrande);aplicarTextoGrande();};
+aplicarTextoGrande();
 $('#btnIniciar').onclick=()=>{
   if(!CATS.some(c=>c.activa)){alert('Prende al menos una categoría.');return;}
   S.rondas=Math.max(3,Math.min(20,+$('#inpRondas').value||8));
@@ -712,7 +748,7 @@ function revelarCasilla(eq,i){
       <div class="tt">${info.tt}</div><div class="ds">${info.ds}</div></div>
     <div id="extra"></div>
     <div style="text-align:center"><button class="b3" id="btnOk" style="${cv(eq.color)}">Aplicar y seguir</button></div></div>`,720);
-  bip(info.cl==='mal'?200:info.cl==='neutro'?400:784,.2,info.cl==='mal'?'sawtooth':'sine');
+  sonarPoder(ef);
   let aplicado=false;
   const finalizar=()=>{
     if(aplicado)return;aplicado=true;
@@ -850,6 +886,7 @@ function terminar(ganador){
       <span class="sc"><b>${e.puntos} pts</b>${e.aciertos} aciertos · espacio ${e.pos}</span></div>`;
   });
   html+=`<div style="display:flex;gap:12px;justify-content:center;margin-top:24px;flex-wrap:wrap">
+    <button class="b3 pale" id="btnCompartir">📤 Compartir resultado</button>
     <button class="b3 pale" id="btnSeguir">Seguir jugando (+2 rondas)</button>
     <button class="b3" id="btnNuevo">Nueva partida</button></div></div>`;
   const c=modal(html,720);
@@ -860,11 +897,25 @@ function terminar(ganador){
     const fila1=c.querySelector('.pod.p1');
     if(fila1){fila1.classList.add('brillar');setTimeout(()=>fila1.classList.remove('brillar'),600);}
   },retraso(0)+420);
+  c.querySelector('#btnCompartir').onclick=()=>compartirResultado(orden);
   c.querySelector('#btnSeguir').onclick=()=>{
     S.fin=false;S.rondas+=2;$('#rondaT').textContent=S.rondas;
     cerrarModal();pintarEquipos();pintarCats();guardar();
   };
   c.querySelector('#btnNuevo').onclick=()=>{ls.del('cbPersJuego');location.reload();};
+}
+/* Usa el "share sheet" nativo del celular si existe (ahí sale WhatsApp junto
+   con las demás apps instaladas); si no, abre un enlace de wa.me con el
+   texto ya armado — funciona en cualquier navegador de escritorio. */
+function compartirResultado(orden){
+  const url=location.origin+location.pathname;
+  const medalla=i=>['🥇','🥈','🥉'][i]||(i+1)+'°';
+  const lineas=orden.map((e,i)=>`${medalla(i)} ${e.nombre} — ${e.puntos} pts`).join('\n');
+  const texto=`🏁 Carrera Bíblica — ¡Partida terminada!\n\n${lineas}\n\nJuega tú también: ${url}`;
+  try{
+    if(navigator.share){navigator.share({text:texto}).catch(()=>{/* el usuario cerró el share sheet sin elegir nada */});return;}
+  }catch{/* algunos navegadores exponen share() pero lo bloquean (p. ej. sin gesto de usuario reciente) */}
+  window.open('https://wa.me/?text='+encodeURIComponent(texto),'_blank','noopener');
 }
 
 /* ============ MODERADOR ============ */

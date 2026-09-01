@@ -409,4 +409,19 @@ textarea{line-height:1.5}
 .footer-copy{max-width:1180px;margin:26px auto 0;padding-top:18px;border-top:1px solid var(--linea);
   color:var(--tinta2);font-weight:600;font-size:12.5px;text-align:center}
 
+/* ============ MODO TEXTO GRANDE ============
+   Agranda lo que de verdad hace falta leer desde lejos en un salón: la
+   pregunta, los nombres/puntajes en el tablero y el podio final. No toca
+   botones ni controles — solo el contenido que se lee, no lo que se toca. */
+body.texto-grande .pregunta{font-size:clamp(32px,4.6vw,54px)}
+body.texto-grande .respuesta .tx{font-size:clamp(26px,3vw,36px)}
+body.texto-grande .ayuda{font-size:21px}
+body.texto-grande .turnera .nm{font-size:clamp(26px,3.4vw,34px)}
+body.texto-grande .eq .nm{font-size:21px}
+body.texto-grande .eq .sc{font-size:34px}
+body.texto-grande .cat .ic{font-size:56px}
+body.texto-grande .cat .nm{font-size:22px}
+body.texto-grande .pod .nm{font-size:22px}
+body.texto-grande .pod .sc b{font-size:26px}
+
 @media(prefers-reduced-motion:reduce){*{animation:none !important;transition:none !important}}
